@@ -1,8 +1,7 @@
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
 import type { Part } from "@opencode-ai/sdk/v2"
 
-const HIDDEN_KEY = "opencode-skill-tracker.hidden"
-const LEGACY_HIDDEN_KEY = "opencode-skills-sidebar.hidden"
+const HIDDEN_KEY = "opencode-skills-tui.hidden"
 
 export interface SkillSummary {
   name: string
@@ -11,7 +10,7 @@ export interface SkillSummary {
 }
 
 export function loadHiddenSkills(api: TuiPluginApi): Set<string> {
-  const raw = api.kv.get<string[]>(HIDDEN_KEY, api.kv.get<string[]>(LEGACY_HIDDEN_KEY, []))
+  const raw = api.kv.get<string[]>(HIDDEN_KEY, [])
   return new Set(Array.isArray(raw) ? raw.filter((name) => typeof name === "string") : [])
 }
 

@@ -16,15 +16,12 @@ import {
 } from "./skill-data"
 
 const SIDEBAR_ORDER = 250
-const COLLAPSED_KEY = "opencode-skill-tracker.collapsed"
-const LEGACY_COLLAPSED_KEY = "opencode-skills-sidebar.collapsed"
+const COLLAPSED_KEY = "opencode-skills-tui.collapsed"
 
 const tui: TuiPlugin = async (api) => {
   const [skills, setSkills] = createSignal<SkillSummary[]>([])
   const [loadVersion, setLoadVersion] = createSignal(0)
-  const [collapsed, setCollapsed] = createSignal(
-    Boolean(api.kv.get(COLLAPSED_KEY, api.kv.get(LEGACY_COLLAPSED_KEY, false))),
-  )
+  const [collapsed, setCollapsed] = createSignal(Boolean(api.kv.get(COLLAPSED_KEY, false)))
   const hiddenSkills = loadHiddenSkills(api)
   const [hiddenVersion, setHiddenVersion] = createSignal(0)
   const hiddenAccessor = () => {
@@ -75,7 +72,7 @@ const tui: TuiPlugin = async (api) => {
     setHiddenVersion((value) => value + 1)
     api.ui.toast({
       variant: "info",
-      title: "Skill Tracker",
+      title: "Skills",
       message: hiddenSkills.has(name) ? `Hid "${name}"` : `Restored "${name}"`,
       duration: 2000,
     })
@@ -89,7 +86,7 @@ const tui: TuiPlugin = async (api) => {
     setHiddenVersion((value) => value + 1)
     api.ui.toast({
       variant: "info",
-      title: "Skill Tracker",
+      title: "Skills",
       message: `Restored ${count} hidden skill${count === 1 ? "" : "s"}`,
       duration: 2000,
     })
@@ -167,7 +164,7 @@ const tui: TuiPlugin = async (api) => {
     } catch (error) {
       api.ui.toast({
         variant: "error",
-        title: "Skill Tracker",
+        title: "Skills",
         message: `Failed to load skills: ${error instanceof Error ? error.message : String(error)}`,
         duration: 5000,
       })
@@ -244,7 +241,7 @@ const tui: TuiPlugin = async (api) => {
           if (!sessionID) {
             api.ui.toast({
               variant: "warning",
-              title: "Skill Tracker",
+              title: "Skills",
               message: "Open a session before using /skills-status.",
               duration: 4000,
             })
@@ -329,7 +326,7 @@ const tui: TuiPlugin = async (api) => {
 }
 
 const plugin: TuiPluginModule & { id: string } = {
-  id: "opencode-skill-tracker",
+  id: "opencode-skills-tui",
   tui,
 }
 

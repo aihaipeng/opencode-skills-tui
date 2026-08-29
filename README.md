@@ -1,10 +1,8 @@
-# opencode-skill-tracker
+# opencode-skills-tui
 
 English | [简体中文](README.zh-CN.md)
 
 An [OpenCode](https://opencode.ai) TUI plugin that adds a `Skills` section to the right sidebar: every skill visible to OpenCode is listed per session, loaded ones are highlighted and sorted first, and individual skills can be hidden from the sidebar.
-
-Formerly `opencode-skills-sidebar`; saved state (collapsed / hidden skills) migrates automatically.
 
 ## Features
 
@@ -13,7 +11,7 @@ Formerly `opencode-skills-sidebar`; saved state (collapsed / hidden skills) migr
 - Loaded skills are highlighted (green bullet) and sorted first, both in the sidebar and in `/skills-status`
 - Collapsible panel header with a live summary — `(X loaded Y available)` (`+Z` when skills are hidden)
 - Hide individual skills via the `/hide-skills` dialog; `Show all hidden` restores everything in one step, and an `N hidden (show all)` footer in the sidebar does the same
-- Collapsed state and hidden set persist across restarts (plugin kv), with automatic migration from the legacy `opencode-skills-sidebar` keys
+- Collapsed state and hidden set persist across restarts (plugin kv)
 - Incremental per-session scanning (message watermark), so long sessions do not trigger repeated full rescans
 
 ## Requirements
@@ -33,7 +31,7 @@ Add the package name to `~/.config/opencode/tui.json`:
 {
   "$schema": "https://opencode.ai/tui.json",
   "plugin": [
-    "opencode-skill-tracker-tui"
+    "opencode-skills-tui"
   ]
 }
 ```
@@ -43,8 +41,8 @@ No manual install is needed — OpenCode installs npm plugins automatically with
 ### Option B: build from source
 
 ```bash
-git clone https://github.com/aihaipeng/opencode-skill-tracker.git
-cd opencode-skill-tracker
+git clone https://github.com/aihaipeng/opencode-skills-tui.git
+cd opencode-skills-tui
 bun install
 bun run build
 ```
@@ -55,7 +53,7 @@ That produces `dist/tui.js`. Register its absolute path in `~/.config/opencode/t
 {
   "$schema": "https://opencode.ai/tui.json",
   "plugin": [
-    "C:\\path\\to\\opencode-skill-tracker\\dist\\tui.js"
+    "C:\\path\\to\\opencode-skills-tui\\dist\\tui.js"
   ]
 }
 ```
@@ -113,4 +111,4 @@ Source layout:
 
 ## License
 
-[MIT](LICENSE) — the npm package is published as [`opencode-skill-tracker-tui`](https://www.npmjs.com/package/opencode-skill-tracker-tui).
+[MIT](LICENSE).

@@ -1,10 +1,8 @@
-# opencode-skill-tracker
+# opencode-skills-tui
 
 [English](README.md) | 简体中文
 
 一个 [OpenCode](https://opencode.ai) TUI 插件：在右侧边栏增加 `Skills` 区块，按会话列出 OpenCode 可见的全部技能，已加载的高亮并排在最前，还可隐藏个别技能。
-
-原 `opencode-skills-sidebar`，已保存状态（折叠 / 隐藏列表）自动迁移。
 
 ## 功能
 
@@ -13,7 +11,7 @@
 - 已加载技能绿色圆点高亮并置顶，侧栏与 `/skills-status` 一致
 - 面板头可折叠，实时摘要 `(X loaded Y available)`（有隐藏技能时追加 `+Z`）
 - `/hide-skills` 对话框可隐藏个别技能；`Show all hidden` 一步恢复全部，侧栏 `N hidden (show all)` 页脚点击同效
-- 折叠状态与隐藏列表跨重启持久化（插件 kv），并从旧 `opencode-skills-sidebar` 键自动迁移
+- 折叠状态与隐藏列表跨重启持久化（插件 kv）
 - 按会话增量扫描（消息水位线），长会话不重复全量重扫
 
 ## 环境要求
@@ -33,7 +31,7 @@
 {
   "$schema": "https://opencode.ai/tui.json",
   "plugin": [
-    "opencode-skill-tracker-tui"
+    "opencode-skills-tui"
   ]
 }
 ```
@@ -43,8 +41,8 @@
 ### 方式二：源码构建
 
 ```bash
-git clone https://github.com/aihaipeng/opencode-skill-tracker.git
-cd opencode-skill-tracker
+git clone https://github.com/aihaipeng/opencode-skills-tui.git
+cd opencode-skills-tui
 bun install
 bun run build
 ```
@@ -55,7 +53,7 @@ bun run build
 {
   "$schema": "https://opencode.ai/tui.json",
   "plugin": [
-    "C:\\path\\to\\opencode-skill-tracker\\dist\\tui.js"
+    "C:\\path\\to\\opencode-skills-tui\\dist\\tui.js"
   ]
 }
 ```
@@ -113,4 +111,4 @@ bun run typecheck  # tsc --noEmit
 
 ## 许可证
 
-[MIT](LICENSE) — npm 包名为 [`opencode-skill-tracker-tui`](https://www.npmjs.com/package/opencode-skill-tracker-tui)。
+[MIT](LICENSE)。

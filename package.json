@@ -1,5 +1,5 @@
 {
-  "name": "opencode-skill-tracker-tui",
+  "name": "opencode-skills-tui",
   "version": "0.1.1",
   "description": "OpenCode TUI plugin that shows skills and loaded state in the sidebar",
   "type": "module",
@@ -7,12 +7,12 @@
   "author": "aihaipeng",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aihaipeng/opencode-skill-tracker.git"
+      "url": "git+https://github.com/aihaipeng/opencode-skills-tui.git"
   },
   "bugs": {
-    "url": "https://github.com/aihaipeng/opencode-skill-tracker/issues"
+    "url": "https://github.com/aihaipeng/opencode-skills-tui/issues"
   },
-  "homepage": "https://github.com/aihaipeng/opencode-skill-tracker#readme",
+  "homepage": "https://github.com/aihaipeng/opencode-skills-tui#readme",
   "keywords": [
     "opencode",
     "opencode-plugin",
