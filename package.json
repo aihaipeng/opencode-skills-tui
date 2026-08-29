@@ -1,0 +1,50 @@
+{
+  "name": "opencode-skill-tracker-tui",
+  "version": "0.1.0",
+  "description": "OpenCode TUI plugin that shows skills and loaded state in the sidebar",
+  "type": "module",
+  "license": "MIT",
+  "author": "aihaipeng",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aihaipeng/opencode-skill-tracker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aihaipeng/opencode-skill-tracker/issues"
+  },
+  "homepage": "https://github.com/aihaipeng/opencode-skill-tracker#readme",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "tui",
+    "skills",
+    "sidebar"
+  ],
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/tui.js",
+      "types": "./dist/tui.d.ts"
+    },
+    "./tui": {
+      "import": "./dist/tui.js",
+      "types": "./dist/tui.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "bun run scripts/build.mjs && tsc --emitDeclarationOnly",
+    "typecheck": "tsc --noEmit",
+    "prepare": "bun run build"
+  },
+  "dependencies": {
+    "@opencode-ai/plugin": "^1.14.29",
+    "@opentui/core": "^0.1.105",
+    "@opentui/solid": "^0.1.105",
+    "solid-js": "^1.9.11"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}
