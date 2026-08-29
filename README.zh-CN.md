@@ -25,24 +25,9 @@
 
 这是 **TUI 插件**，必须配置在 `~/.config/opencode/tui.json`，不是 `opencode.json`。
 
-### 方式 A：npm
+### 方式一：npm 安装（推荐）
 
-直接引用包名（见第 2 步），无需构建。
-
-### 方式 B：源码构建
-
-```bash
-git clone <this-repo>
-cd opencode-skill-tracker
-bun install
-bun run build
-```
-
-产出 `dist/tui.js`。
-
-### 2. 注册到 OpenCode
-
-npm 安装用包名；源码构建用 `dist/tui.js` 绝对路径。加入 `~/.config/opencode/tui.json`：
+在 `~/.config/opencode/tui.json` 中写入包名：
 
 ```json
 {
@@ -53,7 +38,18 @@ npm 安装用包名；源码构建用 `dist/tui.js` 绝对路径。加入 `~/.co
 }
 ```
 
-源码构建则用：
+无需手动安装——OpenCode 启动时会用 Bun 自动安装 npm 插件（缓存在 `~/.cache/opencode/node_modules/`）。
+
+### 方式二：源码构建
+
+```bash
+git clone https://github.com/aihaipeng/opencode-skill-tracker.git
+cd opencode-skill-tracker
+bun install
+bun run build
+```
+
+产出 `dist/tui.js`。在 `~/.config/opencode/tui.json` 中注册其绝对路径：
 
 ```json
 {
@@ -66,9 +62,9 @@ npm 安装用包名；源码构建用 `dist/tui.js` 绝对路径。加入 `~/.co
 
 `plugin` 数组可同时装多个插件，保留已有条目即可。
 
-### 3. 重启 OpenCode
+### 重启 OpenCode
 
-TUI 插件随启动加载，无热重载。构建或更新后请重启 `opencode`。
+TUI 插件随启动加载，无热重载。安装或更新后请重启 `opencode`。
 
 ## 使用
 

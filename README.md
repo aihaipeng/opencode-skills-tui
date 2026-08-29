@@ -25,24 +25,9 @@ Formerly `opencode-skills-sidebar`; saved state (collapsed / hidden skills) migr
 
 This is a **TUI plugin**, so it must be configured in `~/.config/opencode/tui.json`, not in `opencode.json`.
 
-### Option A: from npm
+### Option A: from npm (recommended)
 
-Reference the package name (see step 2) — no build needed.
-
-### Option B: build from source
-
-```bash
-git clone <this-repo>
-cd opencode-skill-tracker
-bun install
-bun run build
-```
-
-That produces `dist/tui.js`.
-
-### 2. Register it in OpenCode
-
-npm installs go by package name; source builds use the absolute path to `dist/tui.js`. Add it to `~/.config/opencode/tui.json`:
+Add the package name to `~/.config/opencode/tui.json`:
 
 ```json
 {
@@ -53,7 +38,18 @@ npm installs go by package name; source builds use the absolute path to `dist/tu
 }
 ```
 
-or, for a source build:
+No manual install is needed — OpenCode installs npm plugins automatically with Bun at startup (cached in `~/.cache/opencode/node_modules/`).
+
+### Option B: build from source
+
+```bash
+git clone https://github.com/aihaipeng/opencode-skill-tracker.git
+cd opencode-skill-tracker
+bun install
+bun run build
+```
+
+That produces `dist/tui.js`. Register its absolute path in `~/.config/opencode/tui.json`:
 
 ```json
 {
@@ -66,9 +62,9 @@ or, for a source build:
 
 Keep any existing entries in the `plugin` array — it can hold multiple plugins.
 
-### 3. Restart OpenCode
+### Restart OpenCode
 
-TUI plugins are loaded at startup; there is no hot reload. Restart `opencode` after building or updating.
+TUI plugins are loaded at startup; there is no hot reload. Restart `opencode` after installing or updating.
 
 ## Usage
 
