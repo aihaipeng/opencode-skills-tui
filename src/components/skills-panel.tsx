@@ -24,22 +24,22 @@ function truncateLabel(value: string, maxWidth: number) {
 export interface SkillsPanelProps {
   skills: Accessor<SkillSummary[]>
   loadedNames: Accessor<Set<string>>
-  hiddenNames: Accessor<Set<string>>
+  loadedOnly: Accessor<boolean>
   theme: Accessor<TuiThemeCurrent>
   collapsed: Accessor<boolean>
   onToggle: () => void
-  onClearHidden: () => void
 }
 
 export function SkillsPanel(props: SkillsPanelProps) {
   const [panelWidth, setPanelWidth] = createSignal(0)
   let panelBox: { width: number } | undefined
   const visibleSkills = createMemo(() => {
-    const hidden = props.hiddenNames()
-    const candidates = props.skills().filter((skill) => !hidden.has(skill.name))
-    return sortSkillsByLoaded(candidates, props.loadedNames())
+    const loaded = props.loadedNames()
+    const candidates = props.loadedOnly()
+      ? props.skills().filter((skill) => loaded.has(skill.name))
+      : props.skills()
+    return sortSkillsByLoaded(candidates, loaded)
   })
-  const hiddenCount = createMemo(() => props.hiddenNames().size)
 
   const textColor = createMemo(() => props.theme().text)
   const mutedColor = createMemo(() => props.theme().textMuted)
@@ -49,12 +49,11 @@ export function SkillsPanel(props: SkillsPanelProps) {
     const loaded = props.loadedNames()
     const loadedCount = visibleSkills().filter((skill) => loaded.has(skill.name)).length
     const total = props.skills().length
-    const hidden = props.hiddenNames().size
-    if (hidden === 0) {
-      return `(${loadedCount} loaded ${total} available)`
-    }
-    return `(${loadedCount} loaded ${total} available +${hidden})`
+    return `(${loadedCount} loaded ${total} available)`
   })
+  const emptyMessage = createMemo(() =>
+    props.loadedOnly() ? "No skills loaded yet" : "No skills available",
+  )
 
   return (
     <box
@@ -77,7 +76,7 @@ export function SkillsPanel(props: SkillsPanelProps) {
       <Show when={!props.collapsed()}>
         <Show
           when={visibleSkills().length > 0}
-          fallback={<text style={{ fg: mutedColor() }}>No skills available</text>}
+          fallback={<text style={{ fg: mutedColor() }}>{emptyMessage()}</text>}
         >
           <For each={visibleSkills()}>
             {(skill) => {
@@ -100,14 +99,6 @@ export function SkillsPanel(props: SkillsPanelProps) {
               )
             }}
           </For>
-        </Show>
-
-        <Show when={hiddenCount() > 0}>
-          <box flexDirection="row" columnGap={1} onMouseDown={props.onClearHidden}>
-            <text style={{ fg: mutedColor() }}>
-              {`${hiddenCount()} hidden (show all)`}
-            </text>
-          </box>
         </Show>
       </Show>
     </box>

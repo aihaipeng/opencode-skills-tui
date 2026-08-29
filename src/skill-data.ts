@@ -1,29 +1,10 @@
 import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
 import type { Part } from "@opencode-ai/sdk/v2"
 
-const HIDDEN_KEY = "opencode-skills-tui.hidden"
-
 export interface SkillSummary {
   name: string
   description: string
   content: string
-}
-
-export function loadHiddenSkills(api: TuiPluginApi): Set<string> {
-  const raw = api.kv.get<string[]>(HIDDEN_KEY, [])
-  return new Set(Array.isArray(raw) ? raw.filter((name) => typeof name === "string") : [])
-}
-
-export function saveHiddenSkills(api: TuiPluginApi, hidden: Set<string>): void {
-  api.kv.set(HIDDEN_KEY, [...hidden].sort())
-}
-
-export function toggleHiddenSkill(hidden: Set<string>, name: string): void {
-  if (hidden.has(name)) {
-    hidden.delete(name)
-  } else {
-    hidden.add(name)
-  }
 }
 
 export async function loadAvailableSkills(api: TuiPluginApi): Promise<SkillSummary[]> {
