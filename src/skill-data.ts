@@ -75,6 +75,39 @@ export function extractLoadedSkillName(part: Part, skills: SkillSummary[] = []):
 }
 
 /**
+ * Server-side scan fallback: TUI state only holds lazily loaded messages, so
+ * after a restart a session's history may be invisible to
+ * api.state.session.messages(). Pulls messages from the server instead.
+ */
+export async function fetchLoadedSkillNames(
+  api: TuiPluginApi,
+  sessionID: string,
+  loaded: Set<string>,
+  scannedMessageIDs: Set<string>,
+  skills: SkillSummary[] = [],
+): Promise<boolean> {
+  const result = await api.client.session.messages({ sessionID, limit: 200 })
+  const items = (result.data ?? []) as Array<{ info?: { id?: string }; parts?: Part[] }>
+  let changed = false
+
+  for (const item of items) {
+    const messageID = item.info?.id
+    if (!messageID || scannedMessageIDs.has(messageID)) continue
+    scannedMessageIDs.add(messageID)
+
+    for (const part of item.parts ?? []) {
+      const skillName = extractLoadedSkillName(part, skills)
+      if (skillName && !loaded.has(skillName)) {
+        loaded.add(skillName)
+        changed = true
+      }
+    }
+  }
+
+  return changed
+}
+
+/**
  * Incrementally scans messages of a session, extracting loaded skill names and
  * merging them into `loaded`. Only messages not already in `scannedMessageIDs`
  * are inspected, so repeated calls are cheap. Returns whether anything new

@@ -2,6 +2,8 @@
 
 import { For, Show, createMemo, createSignal } from "solid-js"
 import type { Accessor } from "solid-js"
+import { MouseButton } from "@opentui/core"
+import type { MouseEvent } from "@opentui/core"
 import type { TuiThemeCurrent } from "@opencode-ai/plugin/tui"
 import type { SkillSummary } from "../skill-data"
 import { sortSkillsByLoaded } from "../skill-data"
@@ -28,6 +30,7 @@ export interface SkillsPanelProps {
   theme: Accessor<TuiThemeCurrent>
   collapsed: Accessor<boolean>
   onToggle: () => void
+  onSkillPreview: (skill: SkillSummary) => void
 }
 
 export function SkillsPanel(props: SkillsPanelProps) {
@@ -89,12 +92,23 @@ export function SkillsPanel(props: SkillsPanelProps) {
                 return truncateLabel(skill.name, panelWidth() - ROW_FIXED_WIDTH)
               }
 
+              // Right-click a skill row: preview its SKILL.md content.
+              // stopPropagation keeps the just-opened dialog from seeing this
+              // mousedown as a click-outside and closing itself; the dialog
+              // must open synchronously to stay inside the render context.
+              const onRowMouseDown = (event: MouseEvent) => {
+                if (event.button !== MouseButton.RIGHT) return
+                event.preventDefault()
+                event.stopPropagation()
+                props.onSkillPreview(skill)
+              }
+
               return (
-                <box flexDirection="row" columnGap={1}>
+                <box flexDirection="row" columnGap={1} onMouseDown={onRowMouseDown}>
                   <text style={{ fg: loaded() ? loadedColor() : mutedColor() }}>
                     {"•"}
                   </text>
-                  <text style={{ fg: textColor() }}>{visibleName()}</text>
+                  <text style={{ fg: loaded() ? loadedColor() : textColor() }}>{visibleName()}</text>
                 </box>
               )
             }}

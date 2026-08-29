@@ -2,15 +2,18 @@
 
 English | [简体中文](README.zh-CN.md)
 
-An [OpenCode](https://opencode.ai) TUI plugin that adds a `Skills` section to the right sidebar: every skill visible to OpenCode is listed per session, loaded ones are highlighted and sorted first, and a toggle can narrow the sidebar down to loaded skills only.
+An [OpenCode](https://opencode.ai) TUI plugin that adds a `Skills` section to the right sidebar listing every skill OpenCode can see. Skills loaded in the current session are marked green and moved to the top, any skill's full SKILL.md is one right-click away, and a toggle can narrow the list down to loaded skills only.
 
 ## ✨ Features
 
-- 📋 `Skills` section in the session sidebar — every skill discovered by OpenCode, sorted by name
-- 🟢 Loaded skills highlighted (green bullet) and sorted first, tracked per session
-- 🎚️ `/skills-loaded-only` toggles the sidebar between all skills and loaded-only
+- 📋 `Skills` section in the session sidebar — every skill OpenCode knows about, sorted by name
+- 🟢 Loaded skills marked green and moved to the top, tracked separately for each session
+- 👁️ Right-click any skill to read its full SKILL.md in a window — scroll with the mouse wheel, close with `esc` or a click outside
+- 🎚️ `/skills-toggle` narrows the sidebar down to loaded skills only
 - 📁 Collapsible panel header with a live summary — `(X loaded Y available)`
-- 💾 Collapsed state and loaded-only preference persist across restarts
+- 🔄 List keeps itself up to date as sessions and messages change
+- 🔔 Notifies you when a newer version is published, with the exact cache directory to delete — OpenCode won't pick up a new release on its own
+- 💾 Your panel preferences survive restarts
 
 ## 📦 Installation
 
@@ -67,13 +70,23 @@ TUI plugins are loaded at startup; there is no hot reload. Restart `opencode` af
 | Action | Result |
 | --- | --- |
 | Click the `Skills` header | Collapse / expand the panel |
-| `/skills-loaded-only` | Toggle the sidebar between all skills and loaded-only |
+| Right-click a skill | Preview its SKILL.md content in a window — scroll with the wheel, close with `esc` or a click outside |
+| `/skills-toggle` | Toggle the sidebar between all skills and loaded-only |
 
-> 💡 A skill loaded via a slash command (`/some-skill`) counts as loaded once the skill body has been pasted into the session.
+## 🧠 How "loaded" is determined
+
+A skill counts as loaded for a session when any of these appears in its messages:
+
+1. The `skill` tool is invoked with that skill's name
+2. A `<skill_content name="...">` injection tag for it
+3. A slash command (`/some-skill`) pastes its body into the session
+
+After a restart the green marks come back on their own — the plugin re-reads each session's history the first time you open it.
 
 ## 🛠️ Troubleshooting
 
 - **No `Skills` section**: check the path in `tui.json` is absolute and correct, then restart. `opencode --pure` skips all external plugins — handy to confirm the plugin is the cause.
+- **Loaded skills not green after a restart**: the plugin re-fetches session history once per session; switch to the session and give it a moment.
 - **Updated the plugin but nothing changed**: restart `opencode`.
 
 ## 🧑‍💻 Development
@@ -88,7 +101,7 @@ bun run typecheck  # tsc --noEmit
 
 ```text
 src/
-├── tui.tsx                       # Plugin entry: sidebar slot, command, persistence
+├── tui.tsx                       # Plugin entry: sidebar panel, skill preview, commands, update check
 ├── skill-data.ts                 # Skill discovery and loaded-state detection
 └── components/
     └── skills-panel.tsx          # Sidebar panel rendering
