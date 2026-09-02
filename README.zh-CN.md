@@ -1,8 +1,17 @@
 # opencode-skills-tui
 
-[English](README.md) | 简体中文
+<p align="center">
+  <a href="README.md">English</a> | 简体中文
+</p>
+<p align="center">
+  <a href="https://www.npmjs.com/package/opencode-skills-tui"><img src="https://img.shields.io/npm/v/opencode-skills-tui" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/opencode-skills-tui"><img src="https://img.shields.io/npm/dm/opencode-skills-tui" alt="npm downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</p>
 
 一个 [OpenCode](https://opencode.ai) TUI 插件：在右侧边栏增加 `Skills` 区块，列出 OpenCode 可见的全部技能。当前会话已加载的技能标绿置顶，右键任意技能即可阅读其完整 SKILL.md，还能一键切换为只看已加载技能。
+
+![demo](assets/demo.gif)
 
 ## ✨ 功能
 
@@ -106,6 +115,8 @@ src/
 └── components/
     └── skills-panel.tsx          # 侧边栏面板渲染
 ```
+
+如果这个插件对你有帮助，欢迎点个 ⭐——能让更多人发现它。
 
 ## 📄 许可证
 

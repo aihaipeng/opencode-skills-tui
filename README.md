@@ -1,8 +1,17 @@
 # opencode-skills-tui
 
-English | [简体中文](README.zh-CN.md)
+<p align="center">
+  English | <a href="README.zh-CN.md">简体中文</a>
+</p>
+<p align="center">
+  <a href="https://www.npmjs.com/package/opencode-skills-tui"><img src="https://img.shields.io/npm/v/opencode-skills-tui" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/opencode-skills-tui"><img src="https://img.shields.io/npm/dm/opencode-skills-tui" alt="npm downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+</p>
 
 An [OpenCode](https://opencode.ai) TUI plugin that adds a `Skills` section to the right sidebar listing every skill OpenCode can see. Skills loaded in the current session are marked green and moved to the top, any skill's full SKILL.md is one right-click away, and a toggle can narrow the list down to loaded skills only.
+
+![demo](assets/demo.gif)
 
 ## ✨ Features
 
@@ -106,6 +115,8 @@ src/
 └── components/
     └── skills-panel.tsx          # Sidebar panel rendering
 ```
+
+If you find this useful, consider giving it a ⭐ — it helps others discover this plugin.
 
 ## 📄 License
 
