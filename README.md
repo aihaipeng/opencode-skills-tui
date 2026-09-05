@@ -50,7 +50,7 @@ Add the package name to `~/.config/opencode/tui.json`:
 }
 ```
 
-OpenCode installs npm plugins automatically at startup, **using [Bun](https://bun.sh)** — so Bun must be on your `PATH`. Without it the install fails silently and the TUI can hang on the loading screen (see Troubleshooting below). Check with `bun --version`; if it's missing, install it first: `curl -fsSL https://bun.sh/install | bash` (macOS/Linux).
+No manual install steps — OpenCode fetches npm plugins automatically at startup with its embedded Bun runtime (no separate Bun install needed). If the TUI hangs on the loading screen, the embedded runtime is likely stuck resolving packages — see Troubleshooting below.
 
 ### Option 3: build from source
 
@@ -88,7 +88,7 @@ TUI plugins are loaded at startup; there is no hot reload. Restart `opencode` af
 <details>
 <summary>Step-by-step instructions when an AI agent is doing the install</summary>
 
-1. Check Bun: `bun --version`. If it's missing, install it from <https://bun.sh> first — the npm auto-install fails silently without it and the TUI hangs on the loading screen.
+1. Don't ask the user to install Bun — OpenCode installs npm plugins with its own embedded Bun runtime. If startup hangs on the loading screen, quit and run `opencode --print-logs` to see whether package resolution is stuck; if so, delete `~/.cache/opencode/` and retry.
 2. Read `~/.config/opencode/tui.json` (create it if missing). This is a **TUI plugin**: it goes into `tui.json`, never into `opencode.json`.
 3. Add `"opencode-skills-tui"` to the `plugin` array, keeping existing entries:
 
@@ -124,7 +124,7 @@ After a restart the green marks come back on their own — the plugin re-reads e
 
 ## 🛠️ Troubleshooting
 
-- **TUI stuck on the loading screen after adding the npm plugin**: the automatic install requires Bun on your `PATH` and fails silently when it is missing. Check with `bun --version`; install Bun or fall back to Option 3 (build from source), then restart `opencode`.
+- **TUI stuck on the loading screen after adding the npm plugin**: OpenCode's embedded Bun runtime is probably hanging while resolving the package (common behind proxies or slow networks; no separate Bun install involved). Quit, then run `opencode --print-logs` to watch the install; if it hangs, delete the cache (`~/.cache/opencode/`) and retry, or fall back to Option 3 (build from source).
 - **No `Skills` section**: check the path in `tui.json` is absolute and correct, then restart. `opencode --pure` skips all external plugins — handy to confirm the plugin is the cause.
 - **Loaded skills not green after a restart**: the plugin re-fetches session history once per session; switch to the session and give it a moment.
 - **Updated the plugin but nothing changed**: restart `opencode`.
