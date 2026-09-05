@@ -28,7 +28,15 @@
 
 这是 **TUI 插件**，必须配置在 `~/.config/opencode/tui.json`，不是 `opencode.json`。
 
-### 方式一：npm 安装（推荐）
+### 方式一：让 AI agent 代装（推荐）
+
+把下面这段话粘贴给 OpenCode 或任意 LLM agent：
+
+```text
+按照 https://raw.githubusercontent.com/aihaipeng/opencode-skills-tui/main/README.md 的说明，安装 opencode-skills-tui 插件。
+```
+
+### 方式二：npm 安装
 
 在 `~/.config/opencode/tui.json` 中写入包名：
 
@@ -41,9 +49,9 @@
 }
 ```
 
-无需手动安装——OpenCode 启动时会用 Bun 自动安装 npm 插件。
+OpenCode 启动时会自动安装 npm 插件，**依赖 [Bun](https://bun.sh)**——`PATH` 中必须有 Bun。缺少时安装会静默失败，TUI 可能一直卡在加载页（见下方故障排查）。用 `bun --version` 检查；没有先安装：`curl -fsSL https://bun.sh/install | bash`（macOS/Linux）。
 
-### 方式二：源码构建
+### 方式三：源码构建
 
 ```bash
 git clone https://github.com/aihaipeng/opencode-skills-tui.git
@@ -74,6 +82,27 @@ bun run build
 
 TUI 插件随启动加载，无热重载。安装或更新后请重启 `opencode`。
 
+### 🤖 给 LLM Agent 的说明
+
+<details>
+<summary>AI agent 代装时按以下步骤执行</summary>
+
+1. 检查 Bun：`bun --version`。若未安装，先从 <https://bun.sh> 安装——缺少 Bun 时 npm 自动安装会静默失败，TUI 会卡在加载页。
+2. 读取 `~/.config/opencode/tui.json`（不存在则创建）。这是 **TUI 插件**：必须写入 `tui.json`，绝不写入 `opencode.json`。
+3. 将 `"opencode-skills-tui"` 加入 `plugin` 数组，保留已有条目：
+
+   ```json
+   {
+     "$schema": "https://opencode.ai/tui.json",
+     "plugin": ["opencode-skills-tui"]
+   }
+   ```
+
+4. 不要手动执行 `npm install` / `bun add`——OpenCode 启动时会自行拉取 npm 插件。
+5. 提醒用户重启 `opencode`（无热重载）。右侧边栏出现 `Skills` 区块即安装成功。
+
+</details>
+
 ## 🚀 使用
 
 | 操作 | 效果 |
@@ -94,6 +123,7 @@ TUI 插件随启动加载，无热重载。安装或更新后请重启 `opencode
 
 ## 🛠️ 故障排查
 
+- **添加 npm 插件后 TUI 卡在加载页**：自动安装依赖 `PATH` 中的 Bun，缺失时会静默失败。用 `bun --version` 检查；安装 Bun，或改用方式三（源码构建），然后重启 `opencode`。
 - **没有 `Skills` 区块**：检查 `tui.json` 路径为绝对路径且正确，然后重启。`opencode --pure` 会跳过所有外部插件，可用来确认问题是否出在插件上。
 - **重启后已加载技能不变绿**：插件会对每个会话自动拉取一次历史；切换到该会话稍等片刻。
 - **更新插件后无变化**：重启 `opencode`。
