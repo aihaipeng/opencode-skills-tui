@@ -20,8 +20,7 @@ import {
 const SIDEBAR_ORDER = 250
 const COLLAPSED_KEY = "opencode-skills-tui.collapsed"
 const LOADED_ONLY_KEY = "opencode-skills-tui.loaded-only"
-const COUNTS_KEY = "opencode-skills-tui.skill-counts"
-const COUNTED_KEY = "opencode-skills-tui.counted-parts"
+const USAGE_KEY = "opencode-skills-tui.usage"
 const NPM_PACKAGE = "opencode-skills-tui"
 // Must match the "xlarge" dialog width in opencode's ui/dialog.tsx.
 const PREVIEW_WIDTH = 116
@@ -190,20 +189,22 @@ const tui: TuiPlugin = async (api) => {
   const [loadedOnly, setLoadedOnly] = createSignal(Boolean(api.kv.get(LOADED_ONLY_KEY, false)))
   // All-time usage counters, persisted via api.kv so they survive restarts.
   const counts = new Map<string, number>()
-  for (const [name, count] of Object.entries(api.kv.get<Record<string, number>>(COUNTS_KEY, {}))) {
+  // Part IDs already counted, per session. Guards against double-counting:
+  // message.part.updated fires repeatedly per part while streaming, and the
+  // post-restart server backfill re-yields parts that live scans already saw.
+  const countedParts = new Map<string, Set<string>>()
+  const usage = api.kv.get<{ counts?: Record<string, number>; counted?: Record<string, string[]> }>(
+    USAGE_KEY,
+    {},
+  )
+  for (const [name, count] of Object.entries(usage.counts ?? {})) {
     if (typeof count === "number" && Number.isFinite(count)) {
       counts.set(name, count)
     }
   }
-  // Part IDs already counted, per session. Guards against double-counting:
-  // message.part.updated fires repeatedly per part while streaming, and the
-  // post-restart server backfill re-yields parts that live scans already saw.
-  const countedParts = new Map<string, Set<string>>(
-    Object.entries(api.kv.get<Record<string, string[]>>(COUNTED_KEY, {})).map(([sessionID, ids]) => [
-      sessionID,
-      new Set(ids.filter((id) => typeof id === "string")),
-    ]),
-  )
+  for (const [sessionID, ids] of Object.entries(usage.counted ?? {})) {
+    countedParts.set(sessionID, new Set(ids.filter((id) => typeof id === "string")))
+  }
   const loadedBySession = new Map<string, Set<string>>()
   const scannedBySession = new Map<string, Set<string>>()
   const fallbackAttempted = new Set<string>()
@@ -297,13 +298,6 @@ const tui: TuiPlugin = async (api) => {
     loadedRefreshTimers.add(timer)
   }
 
-  const scheduleSessionOpenRefresh = (sessionID: string) => {
-    // Session history can hydrate just after navigation. Immediate scans
-    // happen through the side bar render and message/session events; this is
-    // a single slower retry to backfill anything hydrated afterwards.
-    scheduleRefreshLoadedSkills(sessionID, 500)
-  }
-
   const markLoaded = (sessionID: string, skillName: string) => {
     const loaded = getLoadedSkills(sessionID)
     const sizeBefore = loaded.size
@@ -320,19 +314,18 @@ const tui: TuiPlugin = async (api) => {
   // are exact within one instance, approximate across instances. Shard the
   // keys per boot ID if exactness ever matters.
   const persistUsage = () => {
-    api.kv.set(COUNTS_KEY, Object.fromEntries(counts))
-    api.kv.set(
-      COUNTED_KEY,
-      Object.fromEntries([...countedParts].map(([sessionID, ids]) => [sessionID, [...ids]])),
-    )
+    api.kv.set(USAGE_KEY, {
+      counts: Object.fromEntries(counts),
+      counted: Object.fromEntries([...countedParts].map(([sessionID, ids]) => [sessionID, [...ids]])),
+    })
   }
 
-  const recordSkillLoad = (sessionID: string, part: Part) => {
+  const recordSkillLoad = (sessionID: string, part: Part): string | undefined => {
     const skillName = extractLoadedSkillName(part, skills())
     // Only count skills that still exist: calls to deleted or hallucinated
     // skill names must not inflate the stats.
     if (!skillName || !part.id || !skills().some((skill) => skill.name === skillName)) {
-      return
+      return undefined
     }
 
     let counted = countedParts.get(sessionID)
@@ -340,11 +333,12 @@ const tui: TuiPlugin = async (api) => {
       counted = new Set()
       countedParts.set(sessionID, counted)
     }
-    if (counted.has(part.id)) return
-
-    counted.add(part.id)
-    counts.set(skillName, (counts.get(skillName) ?? 0) + 1)
-    persistUsage()
+    if (!counted.has(part.id)) {
+      counted.add(part.id)
+      counts.set(skillName, (counts.get(skillName) ?? 0) + 1)
+      persistUsage()
+    }
+    return skillName
   }
 
   const countParts = (sessionID: string) => (part: Part) => recordSkillLoad(sessionID, part)
@@ -404,8 +398,7 @@ const tui: TuiPlugin = async (api) => {
   scheduleRefreshSkills(250)
 
   const unregisterMessagePartUpdated = api.event.on("message.part.updated", (event) => {
-    recordSkillLoad(event.properties.sessionID, event.properties.part)
-    const skillName = extractLoadedSkillName(event.properties.part, skills())
+    const skillName = recordSkillLoad(event.properties.sessionID, event.properties.part)
     if (skillName) {
       markLoaded(event.properties.sessionID, skillName)
     }
@@ -421,8 +414,9 @@ const tui: TuiPlugin = async (api) => {
       scannedBySession.delete(event.properties.sessionID)
     // countedParts is deliberately kept: counts are global and session
     // deletion never touches them. ponytail: bookkeeping for dead sessions
-    // just accumulates in kv.json (~50 bytes/session) — hand-delete the
-    // opencode-skills-tui.counted-parts key if it ever matters.
+    // just accumulates in kv.json (~50 bytes/session) — upgrade: if the file
+    // ever grows noticeably (> ~1MB or > 10k counted entries), prune counted
+    // entries whose session no longer exists via api.client.session.list().
     if (removed) {
       setLoadVersion((value) => value + 1)
     }
@@ -503,7 +497,10 @@ const tui: TuiPlugin = async (api) => {
       sidebar_content: (_ctx, props) => {
         if (visibleSessionID !== props.session_id) {
           visibleSessionID = props.session_id
-          scheduleSessionOpenRefresh(props.session_id)
+          // Session history can hydrate just after navigation. Immediate scans
+          // happen through the side bar render and message/session events; this
+          // is a single slower retry to backfill anything hydrated afterwards.
+          scheduleRefreshLoadedSkills(props.session_id, 500)
         }
 
         loadVersion()

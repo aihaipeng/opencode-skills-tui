@@ -7,7 +7,6 @@ const version = JSON.parse(readFileSync(fileURLToPath(new URL("../package.json",
 const entrypoint = fileURLToPath(new URL("../src/tui.tsx", import.meta.url))
 const outdir = fileURLToPath(new URL("../dist", import.meta.url))
 const outfile = fileURLToPath(new URL("../dist/tui.js", import.meta.url))
-const sourcemap = fileURLToPath(new URL("../dist/tui.js.map", import.meta.url))
 
 rmSync(outdir, { recursive: true, force: true })
 mkdirSync(outdir, { recursive: true })
@@ -17,7 +16,6 @@ const result = await Bun.build({
   root,
   format: "esm",
   target: "bun",
-  sourcemap: "external",
   write: false,
   plugins: [createSolidTransformPlugin()],
   define: { __PLUGIN_VERSION__: JSON.stringify(version) },
@@ -31,7 +29,4 @@ if (!result.success) {
   process.exit(1)
 }
 
-for (const artifact of result.outputs) {
-  const destination = artifact.kind === "entry-point" ? outfile : sourcemap
-  writeFileSync(destination, Buffer.from(await artifact.arrayBuffer()))
-}
+writeFileSync(outfile, Buffer.from(await result.outputs[0].arrayBuffer()))

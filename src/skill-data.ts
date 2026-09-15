@@ -3,7 +3,6 @@ import type { Part } from "@opencode-ai/sdk/v2"
 
 export interface SkillSummary {
   name: string
-  description: string
   content: string
 }
 
@@ -19,7 +18,6 @@ export async function loadAvailableSkills(api: TuiPluginApi): Promise<SkillSumma
     if (!deduped.has(entry.name)) {
       deduped.set(entry.name, {
         name: entry.name,
-        description: entry.description ?? "",
         content: entry.content ?? "",
       })
     }
