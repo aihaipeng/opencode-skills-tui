@@ -125,7 +125,7 @@ TUI 插件随启动加载，无热重载。安装或更新后请重启 `opencode
 
 ## 🔢 使用次数统计
 
-每次计入的加载都会累加到对应技能的计数上，数据存在 OpenCode 的 TUI 状态文件（`~/.local/state/opencode/kv.json`）里，跨重启保留，删除会话也不影响已有计数。
+每次计入的加载都会即时写入独立的状态文件（`~/.local/state/opencode/opencode-skills-tui-usage.json`），查询时直接读盘，跨重启、跨多个 OpenCode 窗口都保留，删除会话也不影响已有计数。
 
 ## 🛠️ 故障排查
 

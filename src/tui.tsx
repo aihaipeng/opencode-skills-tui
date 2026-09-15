@@ -1,5 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 
+import { readFileSync, writeFileSync } from "node:fs"
+import path from "node:path"
 import type { TuiPlugin, TuiPluginModule } from "@opencode-ai/plugin/tui"
 import { SyntaxStyle } from "@opentui/core"
 import type { MouseEvent } from "@opentui/core"
@@ -20,7 +22,6 @@ import {
 const SIDEBAR_ORDER = 250
 const COLLAPSED_KEY = "opencode-skills-tui.collapsed"
 const LOADED_ONLY_KEY = "opencode-skills-tui.loaded-only"
-const USAGE_KEY = "opencode-skills-tui.usage"
 const NPM_PACKAGE = "opencode-skills-tui"
 // Must match the "xlarge" dialog width in opencode's ui/dialog.tsx.
 const PREVIEW_WIDTH = 116
@@ -187,24 +188,60 @@ const tui: TuiPlugin = async (api) => {
   const [loadVersion, setLoadVersion] = createSignal(0)
   const [collapsed, setCollapsed] = createSignal(Boolean(api.kv.get(COLLAPSED_KEY, false)))
   const [loadedOnly, setLoadedOnly] = createSignal(Boolean(api.kv.get(LOADED_ONLY_KEY, false)))
-  // All-time usage counters, persisted via api.kv so they survive restarts.
-  const counts = new Map<string, number>()
+  // All-time usage counters. Deliberately NOT stored via api.kv: kv rewrites
+  // the whole shared kv.json from each process's memory snapshot on every
+  // set, so concurrent opencode instances (and other plugins) would clobber
+  // each other's counts. A dedicated file, written read-merge-write on every
+  // count, keeps the numbers visible across instances.
+  type UsageData = { counts: Map<string, number>; counted: Map<string, Set<string>> }
+  const usageFile = path.join(api.state.path.state, "opencode-skills-tui-usage.json")
+
+  // The file on disk is the source of truth; the maps below are only a
+  // per-process dedup/display cache hydrated at startup.
+  function readUsage(): UsageData {
+    const counts = new Map<string, number>()
+    const counted = new Map<string, Set<string>>()
+    try {
+      const parsed = JSON.parse(readFileSync(usageFile, "utf8")) as {
+        counts?: Record<string, unknown>
+        counted?: Record<string, unknown>
+      }
+      for (const [name, count] of Object.entries(parsed.counts ?? {})) {
+        if (typeof count === "number" && Number.isFinite(count)) {
+          counts.set(name, count)
+        }
+      }
+      for (const [sessionID, ids] of Object.entries(parsed.counted ?? {})) {
+        if (Array.isArray(ids)) {
+          counted.set(sessionID, new Set(ids.filter((id) => typeof id === "string")))
+        }
+      }
+    } catch {
+      // Missing or corrupt file: start fresh.
+    }
+    return { counts, counted }
+  }
+
+  function writeUsage(usage: UsageData) {
+    try {
+      writeFileSync(
+        usageFile,
+        JSON.stringify({
+          counts: Object.fromEntries(usage.counts),
+          counted: Object.fromEntries([...usage.counted].map(([sessionID, ids]) => [sessionID, [...ids]])),
+        }),
+      )
+    } catch (error) {
+      console.error("Failed to persist skill usage stats", error)
+    }
+  }
+
   // Part IDs already counted, per session. Guards against double-counting:
   // message.part.updated fires repeatedly per part while streaming, and the
   // post-restart server backfill re-yields parts that live scans already saw.
-  const countedParts = new Map<string, Set<string>>()
-  const usage = api.kv.get<{ counts?: Record<string, number>; counted?: Record<string, string[]> }>(
-    USAGE_KEY,
-    {},
-  )
-  for (const [name, count] of Object.entries(usage.counts ?? {})) {
-    if (typeof count === "number" && Number.isFinite(count)) {
-      counts.set(name, count)
-    }
-  }
-  for (const [sessionID, ids] of Object.entries(usage.counted ?? {})) {
-    countedParts.set(sessionID, new Set(ids.filter((id) => typeof id === "string")))
-  }
+  const initial = readUsage()
+  const counts = initial.counts
+  const countedParts = initial.counted
   const loadedBySession = new Map<string, Set<string>>()
   const scannedBySession = new Map<string, Set<string>>()
   const fallbackAttempted = new Set<string>()
@@ -309,17 +346,6 @@ const tui: TuiPlugin = async (api) => {
     }
   }
 
-  // ponytail: api.kv persists as a whole-file snapshot with last-write-wins,
-  // so concurrent opencode instances can lose individual increments — counts
-  // are exact within one instance, approximate across instances. Shard the
-  // keys per boot ID if exactness ever matters.
-  const persistUsage = () => {
-    api.kv.set(USAGE_KEY, {
-      counts: Object.fromEntries(counts),
-      counted: Object.fromEntries([...countedParts].map(([sessionID, ids]) => [sessionID, [...ids]])),
-    })
-  }
-
   const recordSkillLoad = (sessionID: string, part: Part): string | undefined => {
     const skillName = extractLoadedSkillName(part, skills())
     // Only count skills that still exist: calls to deleted or hallucinated
@@ -334,9 +360,23 @@ const tui: TuiPlugin = async (api) => {
       countedParts.set(sessionID, counted)
     }
     if (!counted.has(part.id)) {
+      // Disk is authoritative: read fresh, re-check dedup, +1, write — so an
+      // increment lands even when another opencode instance counted before.
+      // ponytail: no file lock, so two processes incrementing in the same
+      // millisecond can interleave and lose one increment; add a lockfile
+      // with retry if stats ever need more than eventual accuracy.
+      const disk = readUsage()
+      if (disk.counted.get(sessionID)?.has(part.id)) {
+        counted.add(part.id)
+        return skillName
+      }
+      const ids = disk.counted.get(sessionID) ?? new Set<string>()
+      ids.add(part.id)
+      disk.counted.set(sessionID, ids)
+      disk.counts.set(skillName, (disk.counts.get(skillName) ?? 0) + 1)
+      writeUsage(disk)
       counted.add(part.id)
       counts.set(skillName, (counts.get(skillName) ?? 0) + 1)
-      persistUsage()
     }
     return skillName
   }
@@ -344,13 +384,15 @@ const tui: TuiPlugin = async (api) => {
   const countParts = (sessionID: string) => (part: Part) => recordSkillLoad(sessionID, part)
 
   const openSkillStats = () => {
+    // Read from disk so stats written by other opencode instances show up.
+    const snapshot = readUsage().counts
     // replace() resets the stored size to "medium", so setSize must come after
     // it or the preview renders 60 columns wide instead of xlarge.
     api.ui.dialog.replace(
       () => (
         <SkillStatsDialog
           skills={skills()}
-          counts={() => counts}
+          counts={() => snapshot}
           theme={() => api.theme.current}
           onClose={() => api.ui.dialog.clear()}
         />
@@ -414,7 +456,7 @@ const tui: TuiPlugin = async (api) => {
       scannedBySession.delete(event.properties.sessionID)
     // countedParts is deliberately kept: counts are global and session
     // deletion never touches them. ponytail: bookkeeping for dead sessions
-    // just accumulates in kv.json (~50 bytes/session) — upgrade: if the file
+    // just accumulates in the usage file (~50 bytes/session) — upgrade: if it
     // ever grows noticeably (> ~1MB or > 10k counted entries), prune counted
     // entries whose session no longer exists via api.client.session.list().
     if (removed) {

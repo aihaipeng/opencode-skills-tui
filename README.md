@@ -126,7 +126,7 @@ After a restart the green marks come back on their own: the plugin re-reads each
 
 ## 🔢 Usage stats
 
-Every counted load increments a per-skill counter stored in OpenCode's TUI state (`~/.local/state/opencode/kv.json`), so totals survive restarts and deleting a session never changes existing counts.
+Every counted load is written immediately to a dedicated state file (`~/.local/state/opencode/opencode-skills-tui-usage.json`), and the stats view reads straight from disk — totals survive restarts, are shared across OpenCode windows, and deleting a session never changes existing counts.
 
 ## 🛠️ Troubleshooting
 
