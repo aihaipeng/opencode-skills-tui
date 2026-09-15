@@ -419,11 +419,11 @@ const tui: TuiPlugin = async (api) => {
     const removed =
       loadedBySession.delete(event.properties.sessionID) ||
       scannedBySession.delete(event.properties.sessionID)
-    const removedCounted = countedParts.delete(event.properties.sessionID)
-    if (removedCounted) {
-      persistUsage()
-    }
-    if (removed || removedCounted) {
+    // countedParts is deliberately kept: counts are global and session
+    // deletion never touches them. ponytail: bookkeeping for dead sessions
+    // just accumulates in kv.json (~50 bytes/session) — hand-delete the
+    // opencode-skills-tui.counted-parts key if it ever matters.
+    if (removed) {
       setLoadVersion((value) => value + 1)
     }
   })

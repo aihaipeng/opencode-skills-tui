@@ -126,7 +126,7 @@ After a restart the green marks come back on their own: the plugin re-reads each
 
 ## 🔢 Usage stats
 
-Every counted load increments a per-skill counter stored in OpenCode's TUI state (`~/.local/state/opencode/kv.json`), so totals survive restarts. Each message part is counted exactly once, calls to skills that no longer exist are ignored, and deleting a session prunes its bookkeeping. To reset the numbers by hand, remove the `opencode-skills-tui.skill-counts` key from that file. When several OpenCode instances run at the same time, counts stay exact within each instance and may miss occasional increments across them.
+Every counted load increments a per-skill counter stored in OpenCode's TUI state (`~/.local/state/opencode/kv.json`), so totals survive restarts and deleting a session never changes existing counts.
 
 ## 🛠️ Troubleshooting
 

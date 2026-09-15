@@ -125,7 +125,7 @@ TUI 插件随启动加载，无热重载。安装或更新后请重启 `opencode
 
 ## 🔢 使用次数统计
 
-每次计入的加载都会累加到对应技能的计数上，数据存在 OpenCode 的 TUI 状态文件（`~/.local/state/opencode/kv.json`）里，跨重启保留。每条消息 part 只计一次；调用已不存在的技能名不会计入；删除会话会顺带清理其记账数据。想手动清零，删除该文件里的 `opencode-skills-tui.skill-counts` 键即可。同时开多个 OpenCode 实例时，单实例内计数精确，跨实例可能偶发丢失个别增量。
+每次计入的加载都会累加到对应技能的计数上，数据存在 OpenCode 的 TUI 状态文件（`~/.local/state/opencode/kv.json`）里，跨重启保留，删除会话也不影响已有计数。
 
 ## 🛠️ 故障排查
 
