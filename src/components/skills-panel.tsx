@@ -12,14 +12,9 @@ const ELLIPSIS = "..."
 const ROW_FIXED_WIDTH = 3
 
 function truncateLabel(value: string, maxWidth: number) {
-  if (maxWidth <= 0 || value.length <= maxWidth) {
-    return maxWidth <= 0 ? "" : value
-  }
-
-  if (maxWidth <= ELLIPSIS.length) {
-    return ELLIPSIS.slice(0, maxWidth)
-  }
-
+  if (maxWidth <= 0) return ""
+  if (value.length <= maxWidth) return value
+  if (maxWidth <= ELLIPSIS.length) return ELLIPSIS.slice(0, maxWidth)
   return `${value.slice(0, maxWidth - ELLIPSIS.length)}${ELLIPSIS}`
 }
 

@@ -9,25 +9,23 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
-An [OpenCode](https://opencode.ai) TUI plugin that adds a `Skills` section to the right sidebar listing every skill OpenCode can see. Loaded skills are marked green and moved to the top; right-click any skill to read its full SKILL.md; `/skills-toggle` narrows the list to loaded skills, `/skills-stats` shows all-time usage counts per skill.
+An [OpenCode](https://opencode.ai) TUI plugin that adds a `Skills` section to the right sidebar listing every skill OpenCode can see. Loaded skills are marked green and pinned to the top; right-click any skill to read its full SKILL.md; `/skills-toggle` narrows the list to loaded skills, `/skills-stats` shows all-time usage counts per skill.
 
 ![demo](assets/demo.gif)
 
 ## ✨ Features
 
-- 📋 `Skills` section in the session sidebar, listing every skill OpenCode knows about, sorted by name
-- 🟢 Loaded skills marked green and moved to the top, tracked separately for each session
-- 👁️ Right-click any skill to read its full SKILL.md in a window. Scroll with the mouse wheel, close with `esc` or a click outside
-- 🎚️ `/skills-toggle` narrows the sidebar down to loaded skills only
-- 📊 `/skills-stats` opens a window with every skill's total usage count, persisted across restarts
-- 📁 Collapsible panel header with a live `(X loaded Y available)` summary
-- 🔄 List keeps itself up to date as sessions and messages change
-- 🔔 Notifies you when a newer version is published, with the exact cache directory to delete — OpenCode won't pick up a new release on its own
-- 💾 Your panel preferences survive restarts
+- 🟢 Loaded skills marked green and pinned to the top, tracked per session
+- 👁️ Right-click a skill to read its full SKILL.md — scroll with the wheel, close with `esc` or a click outside
+- 🎚️ `/skills-toggle` narrows the sidebar to loaded skills only
+- 📊 `/skills-stats` shows all-time usage counts per skill, persisted across restarts
+- 📁 Collapsible header with a live `(X loaded Y available)` summary; panel preferences persist
+- 🔄 Keeps itself up to date as sessions and messages change
+- 🔔 Update notifications with the exact cache directory to delete
 
 ## 📦 Installation
 
-This is a **TUI plugin**, so it must be configured in `~/.config/opencode/tui.json`, not in `opencode.json`.
+This is a **TUI plugin**: it goes into `~/.config/opencode/tui.json`, not `opencode.json`.
 
 ### Option 1: let your agent do it (recommended)
 
@@ -40,8 +38,6 @@ https://raw.githubusercontent.com/aihaipeng/opencode-skills-tui/main/README.md
 
 ### Option 2: from npm
 
-Add the package name to `~/.config/opencode/tui.json`:
-
 ```json
 {
   "$schema": "https://opencode.ai/tui.json",
@@ -51,7 +47,7 @@ Add the package name to `~/.config/opencode/tui.json`:
 }
 ```
 
-No manual install steps: OpenCode fetches npm plugins automatically at startup with its embedded Bun runtime (no separate Bun install needed). If the TUI hangs on the loading screen, the embedded runtime is likely stuck resolving packages, see Troubleshooting below.
+No manual steps — OpenCode fetches npm plugins itself at startup (embedded Bun runtime, nothing to install). Keep any existing entries; `plugin` holds multiple plugins. Loading screen hangs? See Troubleshooting.
 
 ### Option 3: build from source
 
@@ -62,35 +58,22 @@ bun install
 bun run build
 ```
 
-That produces `dist/tui.js`. Register its absolute path in `~/.config/opencode/tui.json`:
-
-```json
-{
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": [
-    "C:\\path\\to\\opencode-skills-tui\\dist\\tui.js"
-  ]
-}
-```
-
-Keep any existing entries in the `plugin` array — it can hold multiple plugins.
+Then register the absolute path of `dist/tui.js` in `plugin` the same way as Option 2 (e.g. `"C:\\path\\to\\opencode-skills-tui\\dist\\tui.js"`).
 
 ### ⬆️ Updating
 
-- **npm install**: just restart `opencode`; plugins are re-resolved at startup. If the old version is still loaded, delete `~/.cache/opencode/packages/opencode-skills-tui@latest/` and restart again.
-- **Local install**: `git pull`, then `bun install && bun run build`, then restart `opencode`.
+- **npm install**: restart `opencode`; plugins re-resolve at startup. If the old version is still loaded, delete `~/.cache/opencode/packages/opencode-skills-tui@latest/` and restart again.
+- **Local install**: `git pull`, then `bun install && bun run build`, then restart.
 
-### 🔄 Restart OpenCode
-
-TUI plugins are loaded at startup; there is no hot reload. Restart `opencode` after installing or updating.
+No hot reload — restart `opencode` after installing, updating, or changing config.
 
 ### 🤖 For LLM Agents
 
 <details>
 <summary>Step-by-step instructions when an AI agent is doing the install</summary>
 
-1. Don't ask the user to install Bun; OpenCode installs npm plugins with its own embedded Bun runtime. If startup hangs on the loading screen, quit and run `opencode --print-logs` to see whether package resolution is stuck; if so, delete `~/.cache/opencode/` and retry.
-2. Read `~/.config/opencode/tui.json` (create it if missing). This is a **TUI plugin**: it goes into `tui.json`, never into `opencode.json`.
+1. Don't ask the user to install Bun — OpenCode installs npm plugins with its own embedded runtime. Startup hang: run `opencode --print-logs`; if package resolution is stuck, delete `~/.cache/opencode/` and retry.
+2. Edit `~/.config/opencode/tui.json` (create if missing) — TUI plugins go here, never `opencode.json`.
 3. Add `"opencode-skills-tui"` to the `plugin` array, keeping existing entries:
 
    ```json
@@ -100,8 +83,8 @@ TUI plugins are loaded at startup; there is no hot reload. Restart `opencode` af
    }
    ```
 
-4. Don't run `npm install` / `bun add` manually; OpenCode fetches npm plugins itself at startup.
-5. Tell the user to restart `opencode` (no hot reload). A `Skills` section in the right sidebar means it worked.
+4. No manual `npm install` / `bun add` — OpenCode fetches npm plugins itself at startup.
+5. Restart `opencode` (no hot reload). A `Skills` section in the right sidebar means it worked.
 
 </details>
 
@@ -110,7 +93,7 @@ TUI plugins are loaded at startup; there is no hot reload. Restart `opencode` af
 | Action | Result |
 | --- | --- |
 | Click the `Skills` header | Collapse / expand the panel |
-| Right-click a skill | Preview its SKILL.md content in a window — scroll with the wheel, close with `esc` or a click outside |
+| Right-click a skill | Preview its SKILL.md — scroll with the wheel, close with `esc` or a click outside |
 | `/skills-toggle` | Toggle the sidebar between all skills and loaded-only |
 | `/skills-stats` | Show all-time usage counts per skill (deleted skills show as "(deleted)") |
 
@@ -126,14 +109,13 @@ After a restart the green marks come back on their own: the plugin re-reads each
 
 ## 🔢 Usage stats
 
-Every counted load is written immediately to a dedicated state file (`~/.local/state/opencode/opencode-skills-tui-usage.json`), and the stats view reads straight from disk — totals survive restarts, are shared across OpenCode windows, and deleting a session never changes existing counts.
+Counts are written immediately to `~/.local/state/opencode/opencode-skills-tui-usage.json` and read from disk, so totals survive restarts, are shared across OpenCode windows, and never change when a session is deleted.
 
 ## 🛠️ Troubleshooting
 
-- **TUI stuck on the loading screen after adding the npm plugin**: OpenCode's embedded Bun runtime is probably hanging while resolving the package (common behind proxies or slow networks; no separate Bun install involved). Quit, then run `opencode --print-logs` to watch the install; if it hangs, delete the cache (`~/.cache/opencode/`) and retry, or fall back to Option 3 (build from source).
-- **No `Skills` section**: check the path in `tui.json` is absolute and correct, then restart. `opencode --pure` skips all external plugins — handy to confirm the plugin is the cause.
+- **TUI stuck on the loading screen**: the embedded runtime is likely hanging while resolving the package (common behind proxies / slow networks). Run `opencode --print-logs` to watch it; if stuck, delete `~/.cache/opencode/` and retry, or build from source.
+- **No `Skills` section**: check the path in `tui.json` is absolute and correct, then restart. `opencode --pure` skips all external plugins — handy to isolate the cause.
 - **Loaded skills not green after a restart**: the plugin re-fetches session history once per session; switch to the session and give it a moment.
-- **Updated the plugin but nothing changed**: restart `opencode`.
 
 ## 🧑‍💻 Development
 

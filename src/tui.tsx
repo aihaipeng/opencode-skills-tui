@@ -240,7 +240,6 @@ const tui: TuiPlugin = async (api) => {
   // message.part.updated fires repeatedly per part while streaming, and the
   // post-restart server backfill re-yields parts that live scans already saw.
   const initial = readUsage()
-  const counts = initial.counts
   const countedParts = initial.counted
   const loadedBySession = new Map<string, Set<string>>()
   const scannedBySession = new Map<string, Set<string>>()
@@ -376,7 +375,6 @@ const tui: TuiPlugin = async (api) => {
       disk.counts.set(skillName, (disk.counts.get(skillName) ?? 0) + 1)
       writeUsage(disk)
       counted.add(part.id)
-      counts.set(skillName, (counts.get(skillName) ?? 0) + 1)
     }
     return skillName
   }
@@ -446,10 +444,6 @@ const tui: TuiPlugin = async (api) => {
     }
   })
 
-  const unregisterMessageUpdated = api.event.on("message.updated", (event) => {
-    refreshLoadedSkills(event.properties.sessionID)
-  })
-
   const unregisterSessionDeleted = api.event.on("session.deleted", (event) => {
     const removed =
       loadedBySession.delete(event.properties.sessionID) ||
@@ -462,14 +456,6 @@ const tui: TuiPlugin = async (api) => {
     if (removed) {
       setLoadVersion((value) => value + 1)
     }
-  })
-
-  const unregisterSessionCreated = api.event.on("session.created", () => {
-    scheduleRefreshSkills()
-  })
-
-  const unregisterSessionUpdated = api.event.on("session.updated", (event) => {
-    refreshLoadedSkills(event.properties.sessionID)
   })
 
   const unregisterProjectUpdated = api.event.on("project.updated", () => {
@@ -523,10 +509,7 @@ const tui: TuiPlugin = async (api) => {
     loadedRefreshTimers.clear()
 
     unregisterMessagePartUpdated()
-    unregisterMessageUpdated()
     unregisterSessionDeleted()
-    unregisterSessionCreated()
-    unregisterSessionUpdated()
     unregisterProjectUpdated()
     unregisterWorkspaceReady()
     unregisterWorktreeReady()

@@ -15,19 +15,17 @@
 
 ## ✨ 功能
 
-- 📋 会话侧边栏 `Skills` 区块，列出 OpenCode 认识的全部技能，按名称排序
-- 🟢 已加载技能标绿并置顶，各会话独立跟踪
-- 👁️ 右键任意技能，在窗口中阅读完整 SKILL.md。滚轮翻阅，`esc` 或点击窗口外关闭
-- 🎚️ `/skills-toggle` 一键切换为只显示已加载技能
-- 📊 `/skills-stats` 打开窗口查看所有技能的累计使用次数，跨重启保留
-- 📁 面板头可折叠，实时摘要 `(X loaded Y available)`
+- 🟢 已加载技能标绿置顶，各会话独立跟踪
+- 👁️ 右键任意技能，阅读完整 SKILL.md——滚轮翻阅，`esc` 或点击窗口外关闭
+- 🎚️ `/skills-toggle` 只显示已加载技能
+- 📊 `/skills-stats` 查看各技能累计使用次数，跨重启保留
+- 📁 面板头可折叠，实时摘要 `(X loaded Y available)`，面板偏好跨重启保留
 - 🔄 列表随会话与消息变化自动更新
-- 🔔 有新版本发布时提醒你，并给出需要删除的缓存目录——OpenCode 自己不会接住新版本
-- 💾 面板偏好跨重启保留
+- 🔔 有新版本时提醒，并给出需要删除的缓存目录
 
 ## 📦 安装
 
-这是 **TUI 插件**，必须配置在 `~/.config/opencode/tui.json`，不是 `opencode.json`。
+这是 **TUI 插件**：必须配置在 `~/.config/opencode/tui.json`，不是 `opencode.json`。
 
 ### 方式一：让 AI agent 代装（推荐）
 
@@ -39,8 +37,6 @@
 
 ### 方式二：npm 安装
 
-在 `~/.config/opencode/tui.json` 中写入包名：
-
 ```json
 {
   "$schema": "https://opencode.ai/tui.json",
@@ -50,7 +46,7 @@
 }
 ```
 
-无需手动安装，OpenCode 启动时会用自带的内嵌 Bun 运行时自动拉取 npm 插件（不需要单独安装 Bun）。若 TUI 卡在加载页，多半是内嵌运行时解析依赖时挂起，见下方故障排查。
+无需手动操作——OpenCode 启动时用内嵌 Bun 运行时自行拉取 npm 插件。保留 `plugin` 里的已有条目，数组可装多个插件。加载页卡住见故障排查。
 
 ### 方式三：源码构建
 
@@ -61,35 +57,22 @@ bun install
 bun run build
 ```
 
-产出 `dist/tui.js`。在 `~/.config/opencode/tui.json` 中注册其绝对路径：
-
-```json
-{
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": [
-    "C:\\path\\to\\opencode-skills-tui\\dist\\tui.js"
-  ]
-}
-```
-
-`plugin` 数组可同时装多个插件，保留已有条目即可。
+然后把 `dist/tui.js` 的绝对路径按方式二的样子写进 `plugin`（如 `"C:\\path\\to\\opencode-skills-tui\\dist\\tui.js"`）。
 
 ### ⬆️ 更新
 
-- **npm 安装**：重启 `opencode` 即可，启动时会重新解析插件版本。若仍加载旧版，删除 `~/.cache/opencode/packages/opencode-skills-tui@latest/` 后再重启。
-- **本地安装**：`git pull` → `bun install && bun run build` → 重启 `opencode`。
+- **npm 安装**：重启 `opencode` 即可，启动时会重新解析版本。若仍加载旧版，删除 `~/.cache/opencode/packages/opencode-skills-tui@latest/` 后再重启。
+- **本地安装**：`git pull` → `bun install && bun run build` → 重启。
 
-### 🔄 重启 OpenCode
-
-TUI 插件随启动加载，无热重载。安装或更新后请重启 `opencode`。
+无热重载——安装、更新、改配置后都需重启 `opencode`。
 
 ### 🤖 给 LLM Agent 的说明
 
 <details>
 <summary>AI agent 代装时按以下步骤执行</summary>
 
-1. 不要让用户安装 Bun：OpenCode 用自带的内嵌 Bun 运行时安装 npm 插件。若启动卡在加载页，退出后运行 `opencode --print-logs` 查看依赖解析是否卡住；若是，删除 `~/.cache/opencode/` 后重试。
-2. 读取 `~/.config/opencode/tui.json`（不存在则创建）。这是 **TUI 插件**：必须写入 `tui.json`，绝不写入 `opencode.json`。
+1. 不要让用户安装 Bun——OpenCode 用内嵌运行时安装 npm 插件。启动卡住时运行 `opencode --print-logs` 查看依赖解析；若卡住，删除 `~/.cache/opencode/` 后重试。
+2. 编辑 `~/.config/opencode/tui.json`（不存在则创建）——TUI 插件写这里，绝不写 `opencode.json`。
 3. 将 `"opencode-skills-tui"` 加入 `plugin` 数组，保留已有条目：
 
    ```json
@@ -99,8 +82,8 @@ TUI 插件随启动加载，无热重载。安装或更新后请重启 `opencode
    }
    ```
 
-4. 不要手动执行 `npm install` / `bun add`，OpenCode 启动时会自行拉取 npm 插件。
-5. 提醒用户重启 `opencode`（无热重载）。右侧边栏出现 `Skills` 区块即安装成功。
+4. 不要手动执行 `npm install` / `bun add`——OpenCode 启动时自行拉取。
+5. 重启 `opencode`（无热重载）。右侧边栏出现 `Skills` 区块即成功。
 
 </details>
 
@@ -109,9 +92,9 @@ TUI 插件随启动加载，无热重载。安装或更新后请重启 `opencode
 | 操作 | 效果 |
 | --- | --- |
 | 点击 `Skills` 标题 | 折叠 / 展开面板 |
-| 右键技能行 | 在窗口中预览该技能的 SKILL.md 内容，滚轮翻阅，`esc` 或点击窗口外关闭 |
-| `/skills-toggle` | 在「全部技能」与「只看已加载」之间切换侧栏 |
-| `/skills-stats` | 查看所有技能的累计使用次数（已删除的技能会标注 `(deleted)`） |
+| 右键技能行 | 预览该技能的 SKILL.md，滚轮翻阅，`esc` 或点击窗口外关闭 |
+| `/skills-toggle` | 在「全部技能」与「只看已加载」之间切换 |
+| `/skills-stats` | 查看累计使用次数（已删除的技能标注 `(deleted)`） |
 
 ## 🧠 「已加载」如何判定
 
@@ -121,18 +104,17 @@ TUI 插件随启动加载，无热重载。安装或更新后请重启 `opencode
 2. 出现该技能的 `<skill_content name="...">` 注入标签
 3. 斜杠命令（`/某技能`）将其正文粘贴进会话
 
-重启后绿色标记会自动恢复：首次打开某个会话时，插件会重新读取该会话的历史。
+重启后绿色标记自动恢复：首次打开某个会话时，插件会重新读取其历史。
 
 ## 🔢 使用次数统计
 
-每次计入的加载都会即时写入独立的状态文件（`~/.local/state/opencode/opencode-skills-tui-usage.json`），查询时直接读盘，跨重启、跨多个 OpenCode 窗口都保留，删除会话也不影响已有计数。
+计数即时写入 `~/.local/state/opencode/opencode-skills-tui-usage.json`，读取直接走磁盘——跨重启、跨多个 OpenCode 窗口保留，删除会话不影响已有计数。
 
 ## 🛠️ 故障排查
 
-- **添加 npm 插件后 TUI 卡在加载页**：通常是 OpenCode 内嵌的 Bun 运行时解析依赖时挂起（代理/慢网络下常见，与是否安装 Bun 无关）。退出后运行 `opencode --print-logs` 观察安装过程；若卡住，删除缓存 `~/.cache/opencode/` 后重试，或改用方式三（源码构建）。
-- **没有 `Skills` 区块**：检查 `tui.json` 路径为绝对路径且正确，然后重启。`opencode --pure` 会跳过所有外部插件，可用来确认问题是否出在插件上。
+- **TUI 卡在加载页**：多半是内嵌运行时解析依赖挂起（代理/慢网络常见）。运行 `opencode --print-logs` 观察；若卡住，删除 `~/.cache/opencode/` 后重试，或改用源码构建。
+- **没有 `Skills` 区块**：检查 `tui.json` 路径为绝对路径且正确，然后重启。`opencode --pure` 会跳过所有外部插件，可用来定位问题。
 - **重启后已加载技能不变绿**：插件会对每个会话自动拉取一次历史；切换到该会话稍等片刻。
-- **更新插件后无变化**：重启 `opencode`。
 
 ## 🧑‍💻 开发
 

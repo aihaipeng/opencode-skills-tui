@@ -72,6 +72,34 @@ export function extractLoadedSkillName(part: Part, skills: SkillSummary[] = []):
   return undefined
 }
 
+/** Merge a batch of messages into `loaded`, skipping already-scanned ones. */
+function mergeSkillMessages(
+  messages: Array<{ id?: string; parts?: readonly Part[] }>,
+  loaded: Set<string>,
+  scannedMessageIDs: Set<string>,
+  skills: SkillSummary[],
+  onPart?: (part: Part) => void,
+): boolean {
+  let changed = false
+
+  for (const message of messages) {
+    const messageID = message.id
+    if (!messageID || scannedMessageIDs.has(messageID)) continue
+    scannedMessageIDs.add(messageID)
+
+    for (const part of message.parts ?? []) {
+      onPart?.(part)
+      const skillName = extractLoadedSkillName(part, skills)
+      if (skillName && !loaded.has(skillName)) {
+        loaded.add(skillName)
+        changed = true
+      }
+    }
+  }
+
+  return changed
+}
+
 /**
  * Server-side scan fallback: TUI state only holds lazily loaded messages, so
  * after a restart a session's history may be invisible to
@@ -87,31 +115,18 @@ export async function fetchLoadedSkillNames(
 ): Promise<boolean> {
   const result = await api.client.session.messages({ sessionID, limit: 200 })
   const items = (result.data ?? []) as Array<{ info?: { id?: string }; parts?: Part[] }>
-  let changed = false
-
-  for (const item of items) {
-    const messageID = item.info?.id
-    if (!messageID || scannedMessageIDs.has(messageID)) continue
-    scannedMessageIDs.add(messageID)
-
-    for (const part of item.parts ?? []) {
-      onPart?.(part)
-      const skillName = extractLoadedSkillName(part, skills)
-      if (skillName && !loaded.has(skillName)) {
-        loaded.add(skillName)
-        changed = true
-      }
-    }
-  }
-
-  return changed
+  return mergeSkillMessages(
+    items.map((item) => ({ id: item.info?.id, parts: item.parts })),
+    loaded,
+    scannedMessageIDs,
+    skills,
+    onPart,
+  )
 }
 
 /**
- * Incrementally scans messages of a session, extracting loaded skill names and
- * merging them into `loaded`. Only messages not already in `scannedMessageIDs`
- * are inspected, so repeated calls are cheap. Returns whether anything new
- * was added.
+ * Incrementally scans messages of a session via TUI state. Only messages not
+ * already in `scannedMessageIDs` are inspected, so repeated calls are cheap.
  */
 export function scanLoadedSkillNames(
   api: TuiPluginApi,
@@ -121,21 +136,14 @@ export function scanLoadedSkillNames(
   skills: SkillSummary[] = [],
   onPart?: (part: Part) => void,
 ): boolean {
-  let changed = false
-
-  for (const message of api.state.session.messages(sessionID)) {
-    if (scannedMessageIDs.has(message.id)) continue
-    scannedMessageIDs.add(message.id)
-
-    for (const part of api.state.part(message.id)) {
-      onPart?.(part)
-      const skillName = extractLoadedSkillName(part, skills)
-      if (skillName && !loaded.has(skillName)) {
-        loaded.add(skillName)
-        changed = true
-      }
-    }
-  }
-
-  return changed
+  return mergeSkillMessages(
+    api.state.session.messages(sessionID).map((message) => ({
+      id: message.id,
+      parts: api.state.part(message.id),
+    })),
+    loaded,
+    scannedMessageIDs,
+    skills,
+    onPart,
+  )
 }
