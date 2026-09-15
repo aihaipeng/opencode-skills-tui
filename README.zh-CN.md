@@ -9,7 +9,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
-一个 [OpenCode](https://opencode.ai) TUI 插件：在右侧边栏增加 `Skills` 区块，列出 OpenCode 可见的全部技能。当前会话已加载的技能标绿置顶，右键任意技能即可阅读其完整 SKILL.md，还能一键切换为只看已加载技能。
+一个 [OpenCode](https://opencode.ai) TUI 插件：在右侧边栏增加 `Skills` 区块，列出 OpenCode 可见的全部技能。已加载的技能标绿置顶；右键任意技能可读完整 SKILL.md；`/skills-toggle` 只看已加载，`/skills-stats` 查看各技能累计使用次数。
 
 ![demo](assets/demo.gif)
 
@@ -17,8 +17,9 @@
 
 - 📋 会话侧边栏 `Skills` 区块，列出 OpenCode 认识的全部技能，按名称排序
 - 🟢 已加载技能标绿并置顶，各会话独立跟踪
-- 👁️ 右键任意技能，在窗口中阅读完整 SKILL.md——滚轮翻阅，`esc` 或点击窗口外关闭
+- 👁️ 右键任意技能，在窗口中阅读完整 SKILL.md。滚轮翻阅，`esc` 或点击窗口外关闭
 - 🎚️ `/skills-toggle` 一键切换为只显示已加载技能
+- 📊 `/skills-stats` 打开窗口查看所有技能的累计使用次数，跨重启保留
 - 📁 面板头可折叠，实时摘要 `(X loaded Y available)`
 - 🔄 列表随会话与消息变化自动更新
 - 🔔 有新版本发布时提醒你，并给出需要删除的缓存目录——OpenCode 自己不会接住新版本
@@ -49,7 +50,7 @@
 }
 ```
 
-无需手动安装——OpenCode 启动时会用自带的内嵌 Bun 运行时自动拉取 npm 插件（不需要单独安装 Bun）。若 TUI 卡在加载页，多半是内嵌运行时解析依赖时挂起——见下方故障排查。
+无需手动安装，OpenCode 启动时会用自带的内嵌 Bun 运行时自动拉取 npm 插件（不需要单独安装 Bun）。若 TUI 卡在加载页，多半是内嵌运行时解析依赖时挂起，见下方故障排查。
 
 ### 方式三：源码构建
 
@@ -75,7 +76,7 @@ bun run build
 
 ### ⬆️ 更新
 
-- **npm 安装**：重启 `opencode` 即可——启动时会重新解析插件版本。若仍加载旧版，删除 `~/.cache/opencode/packages/opencode-skills-tui@latest/` 后再重启。
+- **npm 安装**：重启 `opencode` 即可，启动时会重新解析插件版本。若仍加载旧版，删除 `~/.cache/opencode/packages/opencode-skills-tui@latest/` 后再重启。
 - **本地安装**：`git pull` → `bun install && bun run build` → 重启 `opencode`。
 
 ### 🔄 重启 OpenCode
@@ -87,7 +88,7 @@ TUI 插件随启动加载，无热重载。安装或更新后请重启 `opencode
 <details>
 <summary>AI agent 代装时按以下步骤执行</summary>
 
-1. 不要让用户安装 Bun——OpenCode 用自带的内嵌 Bun 运行时安装 npm 插件。若启动卡在加载页，退出后运行 `opencode --print-logs` 查看依赖解析是否卡住；若是，删除 `~/.cache/opencode/` 后重试。
+1. 不要让用户安装 Bun：OpenCode 用自带的内嵌 Bun 运行时安装 npm 插件。若启动卡在加载页，退出后运行 `opencode --print-logs` 查看依赖解析是否卡住；若是，删除 `~/.cache/opencode/` 后重试。
 2. 读取 `~/.config/opencode/tui.json`（不存在则创建）。这是 **TUI 插件**：必须写入 `tui.json`，绝不写入 `opencode.json`。
 3. 将 `"opencode-skills-tui"` 加入 `plugin` 数组，保留已有条目：
 
@@ -98,7 +99,7 @@ TUI 插件随启动加载，无热重载。安装或更新后请重启 `opencode
    }
    ```
 
-4. 不要手动执行 `npm install` / `bun add`——OpenCode 启动时会自行拉取 npm 插件。
+4. 不要手动执行 `npm install` / `bun add`，OpenCode 启动时会自行拉取 npm 插件。
 5. 提醒用户重启 `opencode`（无热重载）。右侧边栏出现 `Skills` 区块即安装成功。
 
 </details>
@@ -110,6 +111,7 @@ TUI 插件随启动加载，无热重载。安装或更新后请重启 `opencode
 | 点击 `Skills` 标题 | 折叠 / 展开面板 |
 | 右键技能行 | 在窗口中预览该技能的 SKILL.md 内容，滚轮翻阅，`esc` 或点击窗口外关闭 |
 | `/skills-toggle` | 在「全部技能」与「只看已加载」之间切换侧栏 |
+| `/skills-stats` | 查看所有技能的累计使用次数（已删除的技能会标注 `(deleted)`） |
 
 ## 🧠 「已加载」如何判定
 
@@ -119,7 +121,11 @@ TUI 插件随启动加载，无热重载。安装或更新后请重启 `opencode
 2. 出现该技能的 `<skill_content name="...">` 注入标签
 3. 斜杠命令（`/某技能`）将其正文粘贴进会话
 
-重启后绿色标记会自动恢复——首次打开某个会话时，插件会重新读取该会话的历史。
+重启后绿色标记会自动恢复：首次打开某个会话时，插件会重新读取该会话的历史。
+
+## 🔢 使用次数统计
+
+每次计入的加载都会累加到对应技能的计数上，数据存在 OpenCode 的 TUI 状态文件（`~/.local/state/opencode/kv.json`）里，跨重启保留。每条消息 part 只计一次；调用已不存在的技能名不会计入；删除会话会顺带清理其记账数据。想手动清零，删除该文件里的 `opencode-skills-tui.skill-counts` 键即可。同时开多个 OpenCode 实例时，单实例内计数精确，跨实例可能偶发丢失个别增量。
 
 ## 🛠️ 故障排查
 
@@ -146,7 +152,7 @@ src/
     └── skills-panel.tsx          # 侧边栏面板渲染
 ```
 
-如果这个插件对你有帮助，欢迎点个 ⭐——能让更多人发现它。
+如果这个插件对你有帮助，欢迎点个 ⭐。
 
 ## 📄 许可证
 

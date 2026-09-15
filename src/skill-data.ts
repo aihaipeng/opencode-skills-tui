@@ -85,6 +85,7 @@ export async function fetchLoadedSkillNames(
   loaded: Set<string>,
   scannedMessageIDs: Set<string>,
   skills: SkillSummary[] = [],
+  onPart?: (part: Part) => void,
 ): Promise<boolean> {
   const result = await api.client.session.messages({ sessionID, limit: 200 })
   const items = (result.data ?? []) as Array<{ info?: { id?: string }; parts?: Part[] }>
@@ -96,6 +97,7 @@ export async function fetchLoadedSkillNames(
     scannedMessageIDs.add(messageID)
 
     for (const part of item.parts ?? []) {
+      onPart?.(part)
       const skillName = extractLoadedSkillName(part, skills)
       if (skillName && !loaded.has(skillName)) {
         loaded.add(skillName)
@@ -119,6 +121,7 @@ export function scanLoadedSkillNames(
   loaded: Set<string>,
   scannedMessageIDs: Set<string>,
   skills: SkillSummary[] = [],
+  onPart?: (part: Part) => void,
 ): boolean {
   let changed = false
 
@@ -127,6 +130,7 @@ export function scanLoadedSkillNames(
     scannedMessageIDs.add(message.id)
 
     for (const part of api.state.part(message.id)) {
+      onPart?.(part)
       const skillName = extractLoadedSkillName(part, skills)
       if (skillName && !loaded.has(skillName)) {
         loaded.add(skillName)

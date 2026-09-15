@@ -9,17 +9,18 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
-An [OpenCode](https://opencode.ai) TUI plugin that adds a `Skills` section to the right sidebar listing every skill OpenCode can see. Skills loaded in the current session are marked green and moved to the top, any skill's full SKILL.md is one right-click away, and a toggle can narrow the list down to loaded skills only.
+An [OpenCode](https://opencode.ai) TUI plugin that adds a `Skills` section to the right sidebar listing every skill OpenCode can see. Loaded skills are marked green and moved to the top; right-click any skill to read its full SKILL.md; `/skills-toggle` narrows the list to loaded skills, `/skills-stats` shows all-time usage counts per skill.
 
 ![demo](assets/demo.gif)
 
 ## ✨ Features
 
-- 📋 `Skills` section in the session sidebar — every skill OpenCode knows about, sorted by name
+- 📋 `Skills` section in the session sidebar, listing every skill OpenCode knows about, sorted by name
 - 🟢 Loaded skills marked green and moved to the top, tracked separately for each session
-- 👁️ Right-click any skill to read its full SKILL.md in a window — scroll with the mouse wheel, close with `esc` or a click outside
+- 👁️ Right-click any skill to read its full SKILL.md in a window. Scroll with the mouse wheel, close with `esc` or a click outside
 - 🎚️ `/skills-toggle` narrows the sidebar down to loaded skills only
-- 📁 Collapsible panel header with a live summary — `(X loaded Y available)`
+- 📊 `/skills-stats` opens a window with every skill's total usage count, persisted across restarts
+- 📁 Collapsible panel header with a live `(X loaded Y available)` summary
 - 🔄 List keeps itself up to date as sessions and messages change
 - 🔔 Notifies you when a newer version is published, with the exact cache directory to delete — OpenCode won't pick up a new release on its own
 - 💾 Your panel preferences survive restarts
@@ -50,7 +51,7 @@ Add the package name to `~/.config/opencode/tui.json`:
 }
 ```
 
-No manual install steps — OpenCode fetches npm plugins automatically at startup with its embedded Bun runtime (no separate Bun install needed). If the TUI hangs on the loading screen, the embedded runtime is likely stuck resolving packages — see Troubleshooting below.
+No manual install steps: OpenCode fetches npm plugins automatically at startup with its embedded Bun runtime (no separate Bun install needed). If the TUI hangs on the loading screen, the embedded runtime is likely stuck resolving packages, see Troubleshooting below.
 
 ### Option 3: build from source
 
@@ -76,7 +77,7 @@ Keep any existing entries in the `plugin` array — it can hold multiple plugins
 
 ### ⬆️ Updating
 
-- **npm install**: just restart `opencode` — plugins are re-resolved at startup. If the old version is still loaded, delete `~/.cache/opencode/packages/opencode-skills-tui@latest/` and restart again.
+- **npm install**: just restart `opencode`; plugins are re-resolved at startup. If the old version is still loaded, delete `~/.cache/opencode/packages/opencode-skills-tui@latest/` and restart again.
 - **Local install**: `git pull`, then `bun install && bun run build`, then restart `opencode`.
 
 ### 🔄 Restart OpenCode
@@ -88,7 +89,7 @@ TUI plugins are loaded at startup; there is no hot reload. Restart `opencode` af
 <details>
 <summary>Step-by-step instructions when an AI agent is doing the install</summary>
 
-1. Don't ask the user to install Bun — OpenCode installs npm plugins with its own embedded Bun runtime. If startup hangs on the loading screen, quit and run `opencode --print-logs` to see whether package resolution is stuck; if so, delete `~/.cache/opencode/` and retry.
+1. Don't ask the user to install Bun; OpenCode installs npm plugins with its own embedded Bun runtime. If startup hangs on the loading screen, quit and run `opencode --print-logs` to see whether package resolution is stuck; if so, delete `~/.cache/opencode/` and retry.
 2. Read `~/.config/opencode/tui.json` (create it if missing). This is a **TUI plugin**: it goes into `tui.json`, never into `opencode.json`.
 3. Add `"opencode-skills-tui"` to the `plugin` array, keeping existing entries:
 
@@ -99,7 +100,7 @@ TUI plugins are loaded at startup; there is no hot reload. Restart `opencode` af
    }
    ```
 
-4. Don't run `npm install` / `bun add` manually — OpenCode fetches npm plugins itself at startup.
+4. Don't run `npm install` / `bun add` manually; OpenCode fetches npm plugins itself at startup.
 5. Tell the user to restart `opencode` (no hot reload). A `Skills` section in the right sidebar means it worked.
 
 </details>
@@ -111,6 +112,7 @@ TUI plugins are loaded at startup; there is no hot reload. Restart `opencode` af
 | Click the `Skills` header | Collapse / expand the panel |
 | Right-click a skill | Preview its SKILL.md content in a window — scroll with the wheel, close with `esc` or a click outside |
 | `/skills-toggle` | Toggle the sidebar between all skills and loaded-only |
+| `/skills-stats` | Show all-time usage counts per skill (deleted skills show as "(deleted)") |
 
 ## 🧠 How "loaded" is determined
 
@@ -120,7 +122,11 @@ A skill counts as loaded for a session when any of these appears in its messages
 2. A `<skill_content name="...">` injection tag for it
 3. A slash command (`/some-skill`) pastes its body into the session
 
-After a restart the green marks come back on their own — the plugin re-reads each session's history the first time you open it.
+After a restart the green marks come back on their own: the plugin re-reads each session's history the first time you open it.
+
+## 🔢 Usage stats
+
+Every counted load increments a per-skill counter stored in OpenCode's TUI state (`~/.local/state/opencode/kv.json`), so totals survive restarts. Each message part is counted exactly once, calls to skills that no longer exist are ignored, and deleting a session prunes its bookkeeping. To reset the numbers by hand, remove the `opencode-skills-tui.skill-counts` key from that file. When several OpenCode instances run at the same time, counts stay exact within each instance and may miss occasional increments across them.
 
 ## 🛠️ Troubleshooting
 
@@ -147,7 +153,7 @@ src/
     └── skills-panel.tsx          # Sidebar panel rendering
 ```
 
-If you find this useful, consider giving it a ⭐ — it helps others discover this plugin.
+If you find this useful, consider giving it a ⭐.
 
 ## 📄 License
 

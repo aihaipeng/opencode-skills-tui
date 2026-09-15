@@ -3,8 +3,9 @@
 import type { TuiPlugin, TuiPluginModule } from "@opencode-ai/plugin/tui"
 import { SyntaxStyle } from "@opentui/core"
 import type { MouseEvent } from "@opentui/core"
-import { createSignal } from "solid-js"
-import type { Accessor } from "solid-js"
+import { For, Show, createSignal } from "solid-js"
+import type { Accessor, JSX } from "solid-js"
+import type { Part } from "@opencode-ai/sdk/v2"
 import { useTerminalDimensions } from "@opentui/solid"
 import type { TuiThemeCurrent } from "@opencode-ai/plugin/tui"
 import { SkillsPanel } from "./components/skills-panel"
@@ -19,6 +20,8 @@ import {
 const SIDEBAR_ORDER = 250
 const COLLAPSED_KEY = "opencode-skills-tui.collapsed"
 const LOADED_ONLY_KEY = "opencode-skills-tui.loaded-only"
+const COUNTS_KEY = "opencode-skills-tui.skill-counts"
+const COUNTED_KEY = "opencode-skills-tui.counted-parts"
 const NPM_PACKAGE = "opencode-skills-tui"
 // Must match the "xlarge" dialog width in opencode's ui/dialog.tsx.
 const PREVIEW_WIDTH = 116
@@ -30,16 +33,17 @@ const PREVIEW_WIDTH = 116
 // outside it closes the dialog — mirroring opencode's own backdrop dismiss,
 // but on our terms so the mouseup of the opening right-click (whose mousedown
 // happened before the dialog existed) never closes it.
-function SkillPreviewDialog(props: {
-  skill: SkillSummary
+function DialogShield(props: {
+  width: number
   theme: Accessor<TuiThemeCurrent>
   onClose: () => void
+  children: JSX.Element
 }) {
   const dims = useTerminalDimensions()
   const rows = () => Math.max(6, dims().height - 4)
   const inContent = (x: number, y: number) => {
-    const left = Math.floor((dims().width - PREVIEW_WIDTH) / 2)
-    return x >= left && x < left + PREVIEW_WIDTH && y >= 2 && y < 2 + rows()
+    const left = Math.floor((dims().width - props.width) / 2)
+    return x >= left && x < left + props.width && y >= 2 && y < 2 + rows()
   }
   let downOutside = false
   const onDown = (event: MouseEvent) => {
@@ -59,7 +63,7 @@ function SkillPreviewDialog(props: {
   return (
     <box
       position="absolute"
-      left={-Math.floor((dims().width - PREVIEW_WIDTH) / 2)}
+      left={-Math.floor((dims().width - props.width) / 2)}
       top={-Math.floor(dims().height / 4)}
       width={dims().width}
       height={dims().height}
@@ -76,21 +80,82 @@ function SkillPreviewDialog(props: {
         paddingBottom={1}
         paddingLeft={8}
         paddingRight={8}
-        width={PREVIEW_WIDTH}
+        width={props.width}
         height={rows()}
         backgroundColor={props.theme().backgroundPanel}
       >
-        <box flexDirection="row" justifyContent="space-between" columnGap={2}>
-          <text style={{ fg: props.theme().text }}>
-            <strong>{props.skill.name}</strong>
-          </text>
-          <text style={{ fg: props.theme().textMuted }}>esc to close</text>
-        </box>
-        <scrollbox flexGrow={1} minHeight={0}>
-          <markdown content={props.skill.content} syntaxStyle={SyntaxStyle.create()} />
-        </scrollbox>
+        {props.children}
       </box>
     </box>
+  )
+}
+
+function SkillPreviewDialog(props: {
+  skill: SkillSummary
+  theme: Accessor<TuiThemeCurrent>
+  onClose: () => void
+}) {
+  return (
+    <DialogShield width={PREVIEW_WIDTH} theme={props.theme} onClose={props.onClose}>
+      <box flexDirection="row" justifyContent="space-between" columnGap={2}>
+        <text style={{ fg: props.theme().text }}>
+          <strong>{props.skill.name}</strong>
+        </text>
+        <text style={{ fg: props.theme().textMuted }}>esc to close</text>
+      </box>
+      <scrollbox flexGrow={1} minHeight={0}>
+        <markdown content={props.skill.content} syntaxStyle={SyntaxStyle.create()} />
+      </scrollbox>
+    </DialogShield>
+  )
+}
+
+// All-time usage counts per skill, sorted by count. Deleted skills whose
+// counts are still persisted show up as "(deleted)".
+function SkillStatsDialog(props: {
+  skills: SkillSummary[]
+  counts: Accessor<Map<string, number>>
+  theme: Accessor<TuiThemeCurrent>
+  onClose: () => void
+}) {
+  const exists = (name: string) => props.skills.some((skill) => skill.name === name)
+  const entries = () => {
+    const merged = new Map(props.counts())
+    for (const skill of props.skills) {
+      if (!merged.has(skill.name)) {
+        merged.set(skill.name, 0)
+      }
+    }
+    return [...merged.entries()].sort(
+      (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
+    )
+  }
+  return (
+    <DialogShield width={PREVIEW_WIDTH} theme={props.theme} onClose={props.onClose}>
+      <box flexDirection="row" justifyContent="space-between" columnGap={2}>
+        <text style={{ fg: props.theme().text }}>
+          <strong>Skill usage</strong>
+        </text>
+        <text style={{ fg: props.theme().textMuted }}>esc to close</text>
+      </box>
+      <scrollbox flexGrow={1} minHeight={0}>
+        <Show
+          when={entries().length > 0}
+          fallback={<text style={{ fg: props.theme().textMuted }}>No skill usage recorded yet</text>}
+        >
+          <For each={entries()}>
+            {([name, count]) => (
+              <box flexDirection="row" justifyContent="space-between" columnGap={2}>
+                <text style={{ fg: exists(name) ? props.theme().text : props.theme().textMuted }}>
+                  {exists(name) ? name : `${name} (deleted)`}
+                </text>
+                <text style={{ fg: props.theme().textMuted }}>{String(count)}</text>
+              </box>
+            )}
+          </For>
+        </Show>
+      </scrollbox>
+    </DialogShield>
   )
 }
 
@@ -123,6 +188,22 @@ const tui: TuiPlugin = async (api) => {
   const [loadVersion, setLoadVersion] = createSignal(0)
   const [collapsed, setCollapsed] = createSignal(Boolean(api.kv.get(COLLAPSED_KEY, false)))
   const [loadedOnly, setLoadedOnly] = createSignal(Boolean(api.kv.get(LOADED_ONLY_KEY, false)))
+  // All-time usage counters, persisted via api.kv so they survive restarts.
+  const counts = new Map<string, number>()
+  for (const [name, count] of Object.entries(api.kv.get<Record<string, number>>(COUNTS_KEY, {}))) {
+    if (typeof count === "number" && Number.isFinite(count)) {
+      counts.set(name, count)
+    }
+  }
+  // Part IDs already counted, per session. Guards against double-counting:
+  // message.part.updated fires repeatedly per part while streaming, and the
+  // post-restart server backfill re-yields parts that live scans already saw.
+  const countedParts = new Map<string, Set<string>>(
+    Object.entries(api.kv.get<Record<string, string[]>>(COUNTED_KEY, {})).map(([sessionID, ids]) => [
+      sessionID,
+      new Set(ids.filter((id) => typeof id === "string")),
+    ]),
+  )
   const loadedBySession = new Map<string, Set<string>>()
   const scannedBySession = new Map<string, Set<string>>()
   const fallbackAttempted = new Set<string>()
@@ -170,12 +251,19 @@ const tui: TuiPlugin = async (api) => {
     loadedBySession.set(sessionID, nextLoaded)
     scannedBySession.set(sessionID, nextScanned)
     const messages = api.state.session.messages(sessionID)
-    scanLoadedSkillNames(api, sessionID, nextLoaded, nextScanned, skills())
+    scanLoadedSkillNames(api, sessionID, nextLoaded, nextScanned, skills(), countParts(sessionID))
     // TUI state can be empty right after a restart (lazy loading). Fall back
     // to the server once per session so history-loaded skills still show.
     if (messages.length === 0 && !fallbackAttempted.has(sessionID)) {
       fallbackAttempted.add(sessionID)
-      void fetchLoadedSkillNames(api, sessionID, nextLoaded, nextScanned, skills())
+      void fetchLoadedSkillNames(
+        api,
+        sessionID,
+        nextLoaded,
+        nextScanned,
+        skills(),
+        countParts(sessionID),
+      )
         .then((changed) => {
           if (changed) setLoadVersion((value) => value + 1)
         })
@@ -190,7 +278,7 @@ const tui: TuiPlugin = async (api) => {
     const scanned = scannedBySession.get(sessionID)
 
     if (loaded && scanned) {
-      if (scanLoadedSkillNames(api, sessionID, loaded, scanned, skills())) {
+      if (scanLoadedSkillNames(api, sessionID, loaded, scanned, skills(), countParts(sessionID))) {
         setLoadVersion((value) => value + 1)
       }
       return
@@ -225,6 +313,56 @@ const tui: TuiPlugin = async (api) => {
     if (loaded.size !== sizeBefore) {
       setLoadVersion((value) => value + 1)
     }
+  }
+
+  // ponytail: api.kv persists as a whole-file snapshot with last-write-wins,
+  // so concurrent opencode instances can lose individual increments — counts
+  // are exact within one instance, approximate across instances. Shard the
+  // keys per boot ID if exactness ever matters.
+  const persistUsage = () => {
+    api.kv.set(COUNTS_KEY, Object.fromEntries(counts))
+    api.kv.set(
+      COUNTED_KEY,
+      Object.fromEntries([...countedParts].map(([sessionID, ids]) => [sessionID, [...ids]])),
+    )
+  }
+
+  const recordSkillLoad = (sessionID: string, part: Part) => {
+    const skillName = extractLoadedSkillName(part, skills())
+    // Only count skills that still exist: calls to deleted or hallucinated
+    // skill names must not inflate the stats.
+    if (!skillName || !part.id || !skills().some((skill) => skill.name === skillName)) {
+      return
+    }
+
+    let counted = countedParts.get(sessionID)
+    if (!counted) {
+      counted = new Set()
+      countedParts.set(sessionID, counted)
+    }
+    if (counted.has(part.id)) return
+
+    counted.add(part.id)
+    counts.set(skillName, (counts.get(skillName) ?? 0) + 1)
+    persistUsage()
+  }
+
+  const countParts = (sessionID: string) => (part: Part) => recordSkillLoad(sessionID, part)
+
+  const openSkillStats = () => {
+    // replace() resets the stored size to "medium", so setSize must come after
+    // it or the preview renders 60 columns wide instead of xlarge.
+    api.ui.dialog.replace(
+      () => (
+        <SkillStatsDialog
+          skills={skills()}
+          counts={() => counts}
+          theme={() => api.theme.current}
+          onClose={() => api.ui.dialog.clear()}
+        />
+      ),
+    )
+    api.ui.dialog.setSize("xlarge")
   }
 
   const refreshSkills = async () => {
@@ -266,6 +404,7 @@ const tui: TuiPlugin = async (api) => {
   scheduleRefreshSkills(250)
 
   const unregisterMessagePartUpdated = api.event.on("message.part.updated", (event) => {
+    recordSkillLoad(event.properties.sessionID, event.properties.part)
     const skillName = extractLoadedSkillName(event.properties.part, skills())
     if (skillName) {
       markLoaded(event.properties.sessionID, skillName)
@@ -277,8 +416,14 @@ const tui: TuiPlugin = async (api) => {
   })
 
   const unregisterSessionDeleted = api.event.on("session.deleted", (event) => {
-    const removed = loadedBySession.delete(event.properties.sessionID)
-    if (removed || scannedBySession.delete(event.properties.sessionID)) {
+    const removed =
+      loadedBySession.delete(event.properties.sessionID) ||
+      scannedBySession.delete(event.properties.sessionID)
+    const removedCounted = countedParts.delete(event.properties.sessionID)
+    if (removedCounted) {
+      persistUsage()
+    }
+    if (removed || removedCounted) {
       setLoadVersion((value) => value + 1)
     }
   })
@@ -314,6 +459,17 @@ const tui: TuiPlugin = async (api) => {
         slashName: "skills-toggle",
         run() {
           toggleLoadedOnly()
+        },
+      },
+      {
+        name: "skills-stats",
+        namespace: "palette",
+        title: "Skills Stats",
+        desc: "Show all-time usage counts per skill",
+        category: "Skills",
+        slashName: "skills-stats",
+        run() {
+          openSkillStats()
         },
       },
     ],
