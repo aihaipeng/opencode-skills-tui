@@ -2,6 +2,9 @@ import type { Context } from "@opencode/plugin/tui/context"
 
 export interface SkillSummary {
   name: string
+  description?: string
+  /** SKILL.md location on disk; the server strips frontmatter from content. */
+  path?: string
   content: string
 }
 
@@ -12,13 +15,17 @@ export async function loadAvailableSkills(ctx: Context): Promise<SkillSummary[]>
 }
 
 /** Dedupe the server's skill list by display name and sort it. */
-export function toSummaries(skills: readonly { name: string; content?: string }[]): SkillSummary[] {
+export function toSummaries(
+  skills: readonly { name: string; description?: string; path?: string; content?: string }[],
+): SkillSummary[] {
   const deduped = new Map<string, SkillSummary>()
 
   for (const entry of skills) {
     if (!deduped.has(entry.name)) {
       deduped.set(entry.name, {
         name: entry.name,
+        description: entry.description,
+        path: entry.path,
         content: entry.content ?? "",
       })
     }

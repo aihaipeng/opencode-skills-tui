@@ -1,5 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 
+import { readFileSync } from "node:fs"
 import { Plugin } from "@opencode/plugin/tui"
 import { CodeRenderable, SyntaxStyle, isRenderable } from "@opentui/core"
 import type { Renderable } from "@opentui/core"
@@ -41,18 +42,39 @@ function enableMarkdownWrapping(renderable: Renderable) {
   }
 }
 
+/** Splits a leading `---` frontmatter fence off the body; the fences themselves never render. */
+function splitFrontmatter(raw: string): { frontmatter?: string; body: string } {
+  const match = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(raw)
+  if (!match) return { body: raw }
+  return { frontmatter: match[1], body: raw.slice(match[0].length) }
+}
+
 function SkillPreviewDialog(props: {
   skill: SkillSummary
+  raw?: string
   theme: Accessor<ResolvedTheme>
 }) {
   const dims = useTerminalDimensions()
   const syntaxStyle = createMarkdownSyntax(props.theme())
   onCleanup(() => syntaxStyle.destroy())
 
+  let content: string
+  if (props.raw) {
+    // Verbatim SKILL.md: frontmatter fields stay visible; only the `---`
+    // fence lines are dropped so they don't render as an unwanted rule.
+    const { frontmatter, body } = splitFrontmatter(props.raw)
+    content = frontmatter ? `${frontmatter}\n\n${body.trim()}\n` : props.raw
+  } else if (props.skill.description) {
+    // Fallback when the file is unreadable: the server strips frontmatter
+    // from content, so show the parsed description as a quote.
+    content = `> ${props.skill.description}\n\n${props.skill.content}`
+  } else {
+    content = props.skill.content
+  }
+
   return (
     <box
       flexDirection="column"
-      rowGap={1}
       paddingBottom={1}
       paddingLeft={2}
       paddingRight={2}
@@ -60,16 +82,11 @@ function SkillPreviewDialog(props: {
       height={Math.max(1, dims().height - 4)}
       backgroundColor={props.theme().surface("dialog").background.base}
     >
-      <box>
-        <text style={{ fg: props.theme().text.base }}>
-          <strong>{props.skill.name}</strong>
-        </text>
-      </box>
       <scrollbox width="100%" flexGrow={1} minHeight={0} paddingRight={1} scrollX={false}>
         <markdown
           ref={enableMarkdownWrapping}
           width="100%"
-          content={props.skill.content}
+          content={content}
           syntaxStyle={syntaxStyle}
           tableOptions={{ wrapMode: "char" }}
         />
@@ -82,7 +99,10 @@ export default Plugin.define({
   id: "opencode-skills-tui",
   setup(ctx) {
     const [skills, setSkills] = createSignal<SkillSummary[]>([])
-    const [prefs, mutatePrefs] = ctx.storage.store<{ collapsed: boolean }>("prefs", {
+    // storage.store live-syncs across running TUI instances: collapsing one
+    // terminal would collapse every terminal. Per-terminal UI state belongs
+    // in memory storage, which is scoped to this TUI process.
+    const [prefs, mutatePrefs] = ctx.storage.memory<{ collapsed: boolean }>("prefs", {
       initial: { collapsed: false },
     })
 
@@ -114,15 +134,26 @@ export default Plugin.define({
     }
 
     const toggleCollapsed = () => {
-      void mutatePrefs((draft) => {
+      mutatePrefs((draft) => {
         draft.collapsed = !draft.collapsed
       })
     }
 
     const openSkillPreview = (skill: SkillSummary) => {
+      // Read the SKILL.md from disk and render it verbatim; normalize CRLF so
+      // Windows line endings can't leak into the rendered lines. Unreadable
+      // files fall back to the stripped server content.
+      let raw: string | undefined
+      if (skill.path) {
+        try {
+          raw = readFileSync(skill.path, "utf8").replace(/\r\n/g, "\n")
+        } catch {
+          // Unreadable (missing, permissions, remote skill): fall back below.
+        }
+      }
       // dialog.set() targets the active dialog, so show it first.
       ctx.ui.dialog.show(() => (
-        <SkillPreviewDialog skill={skill} theme={() => ctx.theme} />
+        <SkillPreviewDialog skill={skill} raw={raw} theme={() => ctx.theme} />
       ))
       ctx.ui.dialog.set({ size: "xlarge", centered: true })
     }
