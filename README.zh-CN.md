@@ -1,141 +1,86 @@
-# opencode-skills-tui
+# 🧩 opencode-skills-tui
 
 <p align="center">
-  <a href="README.md">English</a> | 简体中文
+  <a href="README.md">English</a> | <a href="README.zh-CN.md">简体中文</a>
 </p>
+
 <p align="center">
   <a href="https://www.npmjs.com/package/opencode-skills-tui"><img src="https://img.shields.io/npm/v/opencode-skills-tui" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/opencode-skills-tui"><img src="https://img.shields.io/npm/dm/opencode-skills-tui" alt="npm downloads"></a>
+  <a href="https://www.npmjs.com/package/opencode-skills-tui"><img src="https://img.shields.io/npm/dm/opencode-skills-tui" alt="npm downloads per month"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
-一个 [OpenCode](https://opencode.ai) TUI 插件：在右侧边栏增加 `Skills` 区块，列出 OpenCode 可见的全部技能。已加载的技能标绿置顶；右键任意技能可读完整 SKILL.md；`/skills-toggle` 只看已加载，`/skills-stats` 查看各技能累计使用次数。
+给 [**OpenCode V2**](https://opencode.ai/v2/docs/) 的侧边栏加一份技能列表。看看有哪些技能、当前会话加载了哪些，再点开 SKILL.md，在终端里就能搞定。
 
-![demo](assets/demo.gif)
+![技能面板演示](assets/demo.gif)
 
 ## ✨ 功能
 
-- 🟢 已加载技能标绿置顶，各会话独立跟踪
-- 👁️ 右键任意技能，阅读完整 SKILL.md——滚轮翻阅，`esc` 或点击窗口外关闭
-- 🎚️ `/skills-toggle` 只显示已加载技能
-- 📊 `/skills-stats` 查看各技能累计使用次数，跨重启保留
-- 📁 面板头可折叠，实时摘要 `(X loaded Y available)`，面板偏好跨重启保留
-- 🔄 列表随会话与消息变化自动更新
-- 🔔 有新版本时提醒，并给出需要删除的缓存目录
+- 查看当前项目可用的技能。
+- 已加载技能标绿置顶，各会话独立记录。
+- 点击技能即可预览 SKILL.md，支持滚动阅读。
+- 列表自动更新，面板可折叠并记住你的偏好。
 
 ## 📦 安装
 
-这是 **TUI 插件**：必须配置在 `~/.config/opencode/tui.json`，不是 `opencode.json`。
+### 让 Agent 帮你装（推荐）
 
-### 方式一：让 AI agent 代装（推荐）
-
-把下面这段话粘贴给 OpenCode 或任意 LLM agent：
+把下面这段话发给 OpenCode 或你常用的编程 Agent：
 
 ```text
-按照 https://raw.githubusercontent.com/aihaipeng/opencode-skills-tui/main/README.md 的说明，安装 opencode-skills-tui 插件。
+请按照这份 README 的手动安装部分，为 OpenCode V2 安装 opencode-skills-tui，并保留我已有的配置：
+https://raw.githubusercontent.com/aihaipeng/opencode-skills-tui/main/README.md
 ```
 
-### 方式二：npm 安装
+### 手动安装
+
+在 `~/.config/opencode/cli.json` 中添加插件，保留已有配置：
 
 ```json
 {
-  "$schema": "https://opencode.ai/tui.json",
-  "plugin": [
-    "opencode-skills-tui"
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "plugins": [
+    {
+      "package": "opencode-skills-tui"
+    }
   ]
 }
 ```
 
-无需手动操作——OpenCode 启动时用内嵌 Bun 运行时自行拉取 npm 插件。保留 `plugin` 里的已有条目，数组可装多个插件。加载页卡住见故障排查。
+OpenCode 会自动从 npm 下载插件，并重载受监控的配置变更。
 
-### 方式三：源码构建
+## 🖱️ 怎么用
+
+| 操作 | 效果 |
+| --- | --- |
+| 点击技能 | 预览它的 SKILL.md |
+| 在预览中滚动 | 继续阅读 |
+| 按 `esc` 或点击预览窗口外 | 关闭预览 |
+| 点击 `Skills` | 折叠 / 展开面板 |
+
+## 🟢 已加载状态
+
+绿色表示 OpenCode 已在当前会话中加载该技能。点开预览不会加载技能。每个会话独立记录，重启后再次打开会话，也会恢复已有标记。
+
+## 🔧 小提示
+
+- **没有 Skills 面板？** 检查 OpenCode 版本和 `plugins` 配置，再重启确认。运行 `opencode --print-logs` 可查看插件加载日志。
+- **列表是空的？** 确认 OpenCode 能发现当前项目或全局配置中的技能。
+- **已加载的技能没变绿？** 切换到对应会话，稍等片刻，让加载状态恢复。
+- **改动没生效？** V2 会重载受监控的插件和配置文件；未受监控的本地依赖可能仍需重启。
+
+## 🛠️ 开发
+
+想改插件代码？克隆仓库，再装好开发工具需要的 [Bun](https://bun.sh)：
 
 ```bash
 git clone https://github.com/aihaipeng/opencode-skills-tui.git
 cd opencode-skills-tui
 bun install
-bun run build
+bun run typecheck
+bun run test
 ```
 
-然后把 `dist/tui.js` 的绝对路径按方式二的样子写进 `plugin`（如 `"C:\\path\\to\\opencode-skills-tui\\dist\\tui.js"`）。
+OpenCode 会直接编译 TSX 入口，并重载受监控的文件。改动没被检测到时，再重启确认。测试覆盖技能列表整理和已加载技能置顶排序。
 
-### ⬆️ 更新
-
-- **npm 安装**：重启 `opencode` 即可，启动时会重新解析版本。若仍加载旧版，删除 `~/.cache/opencode/packages/opencode-skills-tui@latest/` 后再重启。
-- **本地安装**：`git pull` → `bun install && bun run build` → 重启。
-
-无热重载——安装、更新、改配置后都需重启 `opencode`。
-
-### 🤖 给 LLM Agent 的说明
-
-<details>
-<summary>AI agent 代装时按以下步骤执行</summary>
-
-1. 不要让用户安装 Bun——OpenCode 用内嵌运行时安装 npm 插件。启动卡住时运行 `opencode --print-logs` 查看依赖解析；若卡住，删除 `~/.cache/opencode/` 后重试。
-2. 编辑 `~/.config/opencode/tui.json`（不存在则创建）——TUI 插件写这里，绝不写 `opencode.json`。
-3. 将 `"opencode-skills-tui"` 加入 `plugin` 数组，保留已有条目：
-
-   ```json
-   {
-     "$schema": "https://opencode.ai/tui.json",
-     "plugin": ["opencode-skills-tui"]
-   }
-   ```
-
-4. 不要手动执行 `npm install` / `bun add`——OpenCode 启动时自行拉取。
-5. 重启 `opencode`（无热重载）。右侧边栏出现 `Skills` 区块即成功。
-
-</details>
-
-## 🚀 使用
-
-| 操作 | 效果 |
-| --- | --- |
-| 点击 `Skills` 标题 | 折叠 / 展开面板 |
-| 右键技能行 | 预览该技能的 SKILL.md，滚轮翻阅，`esc` 或点击窗口外关闭 |
-| `/skills-toggle` | 在「全部技能」与「只看已加载」之间切换 |
-| `/skills-stats` | 查看累计使用次数（已删除的技能标注 `(deleted)`） |
-
-## 🧠 「已加载」如何判定
-
-会话消息中出现以下任一情形，即视为该技能已加载：
-
-1. `skill` 工具以该技能名称被调用
-2. 出现该技能的 `<skill_content name="...">` 注入标签
-3. 斜杠命令（`/某技能`）将其正文粘贴进会话
-
-重启后绿色标记自动恢复：首次打开某个会话时，插件会重新读取其历史。
-
-## 🔢 使用次数统计
-
-计数即时写入 `~/.local/state/opencode/opencode-skills-tui-usage.json`，读取直接走磁盘——跨重启、跨多个 OpenCode 窗口保留，删除会话不影响已有计数。
-
-## 🛠️ 故障排查
-
-- **TUI 卡在加载页**：多半是内嵌运行时解析依赖挂起（代理/慢网络常见）。运行 `opencode --print-logs` 观察；若卡住，删除 `~/.cache/opencode/` 后重试，或改用源码构建。
-- **没有 `Skills` 区块**：检查 `tui.json` 路径为绝对路径且正确，然后重启。`opencode --pure` 会跳过所有外部插件，可用来定位问题。
-- **重启后已加载技能不变绿**：插件会对每个会话自动拉取一次历史；切换到该会话稍等片刻。
-
-## 🧑‍💻 开发
-
-```bash
-bun install
-bun run build      # 打包到 dist/tui.js + 声明
-bun run typecheck  # tsc --noEmit
-```
-
-### 📂 源码结构
-
-```text
-src/
-├── tui.tsx                       # 插件入口：侧边栏面板、技能预览、命令注册、版本检查
-├── skill-data.ts                 # 技能发现与加载状态检测
-└── components/
-    └── skills-panel.tsx          # 侧边栏面板渲染
-```
-
-如果这个插件对你有帮助，欢迎点个 ⭐。
-
-## 📄 许可证
-
-[MIT](LICENSE)
+[插件安装](https://opencode.ai/v2/docs/cli/plugins) · [V2 插件 API](https://opencode.ai/v2/docs/build/plugins/cli) · [MIT 许可证](LICENSE)

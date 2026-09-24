@@ -1,109 +1,81 @@
 /** @jsxImportSource @opentui/solid */
 
-import { For, Show, createMemo, createSignal } from "solid-js"
+import { For, Show, createMemo } from "solid-js"
 import type { Accessor } from "solid-js"
-import { MouseButton } from "@opentui/core"
 import type { MouseEvent } from "@opentui/core"
-import type { TuiThemeCurrent } from "@opencode-ai/plugin/tui"
+import type { ResolvedTheme } from "@opencode/theme/tui"
 import type { SkillSummary } from "../skill-data"
 import { sortSkillsByLoaded } from "../skill-data"
-
-const ELLIPSIS = "..."
-const ROW_FIXED_WIDTH = 3
-
-function truncateLabel(value: string, maxWidth: number) {
-  if (maxWidth <= 0) return ""
-  if (value.length <= maxWidth) return value
-  if (maxWidth <= ELLIPSIS.length) return ELLIPSIS.slice(0, maxWidth)
-  return `${value.slice(0, maxWidth - ELLIPSIS.length)}${ELLIPSIS}`
-}
 
 export interface SkillsPanelProps {
   skills: Accessor<SkillSummary[]>
   loadedNames: Accessor<Set<string>>
-  loadedOnly: Accessor<boolean>
-  theme: Accessor<TuiThemeCurrent>
+  theme: Accessor<ResolvedTheme>
   collapsed: Accessor<boolean>
   onToggle: () => void
   onSkillPreview: (skill: SkillSummary) => void
 }
 
 export function SkillsPanel(props: SkillsPanelProps) {
-  const [panelWidth, setPanelWidth] = createSignal(0)
-  let panelBox: { width: number } | undefined
   const visibleSkills = createMemo(() => {
     const loaded = props.loadedNames()
-    const candidates = props.loadedOnly()
-      ? props.skills().filter((skill) => loaded.has(skill.name))
-      : props.skills()
-    return sortSkillsByLoaded(candidates, loaded)
+    return sortSkillsByLoaded(props.skills(), loaded)
   })
 
-  const textColor = createMemo(() => props.theme().text)
-  const mutedColor = createMemo(() => props.theme().textMuted)
-  const loadedColor = createMemo(() => props.theme().success)
-  const title = createMemo(() => (props.collapsed() ? "▶ Skills" : "▼ Skills"))
   const headerSummary = createMemo(() => {
     const loaded = props.loadedNames()
     const loadedCount = visibleSkills().filter((skill) => loaded.has(skill.name)).length
     const total = props.skills().length
     return `(${loadedCount} loaded ${total} available)`
   })
-  const emptyMessage = createMemo(() =>
-    props.loadedOnly() ? "No skills loaded yet" : "No skills available",
-  )
 
   return (
-    <box
-      flexDirection="column"
-      ref={(element) => {
-        panelBox = element
-        setPanelWidth(element.width)
-      }}
-      onSizeChange={() => setPanelWidth(panelBox?.width ?? 0)}
-    >
+    <box flexDirection="column">
       <box flexDirection="row" columnGap={1} onMouseDown={props.onToggle}>
-        <text style={{ fg: textColor() }}>
-          <strong>{title()}</strong>
+        <text style={{ fg: props.theme().text.base }}>
+          <strong>{props.collapsed() ? "▶ Skills" : "▼ Skills"}</strong>
         </text>
         <Show when={props.collapsed()}>
-          <text style={{ fg: mutedColor() }}>{headerSummary()}</text>
+          <text style={{ fg: props.theme().text.muted }}>{headerSummary()}</text>
         </Show>
       </box>
 
       <Show when={!props.collapsed()}>
         <Show
           when={visibleSkills().length > 0}
-          fallback={<text style={{ fg: mutedColor() }}>{emptyMessage()}</text>}
+          fallback={<text style={{ fg: props.theme().text.muted }}>No skills available</text>}
         >
           <For each={visibleSkills()}>
             {(skill) => {
               const loaded = () => props.loadedNames().has(skill.name)
-              const visibleName = () => {
-                if (panelWidth() <= 0) {
-                  return skill.name
-                }
-
-                return truncateLabel(skill.name, panelWidth() - ROW_FIXED_WIDTH)
-              }
-
-              // Right-click a skill row: preview its SKILL.md content.
-              // stopPropagation keeps the just-opened dialog from seeing this
-              // mousedown as a click-outside and closing itself; the dialog
-              // must open synchronously to stay inside the render context.
               const onRowMouseDown = (event: MouseEvent) => {
-                if (event.button !== MouseButton.RIGHT) return
+                if (event.button !== 0) return
                 event.preventDefault()
                 event.stopPropagation()
                 props.onSkillPreview(skill)
               }
 
               return (
-                <box flexDirection="row" columnGap={1} onMouseDown={onRowMouseDown}>
-                  <text style={{ fg: loaded() ? loadedColor() : mutedColor() }}>
+                <box width="100%" flexDirection="row" columnGap={1} onMouseDown={onRowMouseDown}>
+                  <text
+                    style={{
+                      fg: loaded() ? props.theme().text.feedback.success.base : props.theme().text.muted,
+                    }}
+                  >
                     {"•"}
                   </text>
-                  <text style={{ fg: loaded() ? loadedColor() : textColor() }}>{visibleName()}</text>
+                  <text
+                    flexGrow={1}
+                    minWidth={0}
+                    height={1}
+                    wrapMode="none"
+                    truncate
+                    style={{
+                      fg: loaded() ? props.theme().text.feedback.success.base : props.theme().text.base,
+                    }}
+                  >
+                    {skill.name}
+                  </text>
                 </box>
               )
             }}

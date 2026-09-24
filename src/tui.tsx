@@ -1,559 +1,199 @@
 /** @jsxImportSource @opentui/solid */
 
-import { readFileSync, writeFileSync } from "node:fs"
-import path from "node:path"
-import type { TuiPlugin, TuiPluginModule } from "@opencode-ai/plugin/tui"
-import { SyntaxStyle } from "@opentui/core"
-import type { MouseEvent } from "@opentui/core"
-import { For, Show, createSignal } from "solid-js"
-import type { Accessor, JSX } from "solid-js"
-import type { Part } from "@opencode-ai/sdk/v2"
+import { Plugin } from "@opencode/plugin/tui"
+import { CodeRenderable, SyntaxStyle, isRenderable } from "@opentui/core"
+import type { Renderable } from "@opentui/core"
+import { createSignal, onCleanup } from "solid-js"
+import type { Accessor } from "solid-js"
 import { useTerminalDimensions } from "@opentui/solid"
-import type { TuiThemeCurrent } from "@opencode-ai/plugin/tui"
+import type { ResolvedTheme } from "@opencode/theme/tui"
 import { SkillsPanel } from "./components/skills-panel"
 import {
-  extractLoadedSkillName,
-  fetchLoadedSkillNames,
+  backfillLoadedSkills,
   loadAvailableSkills,
-  scanLoadedSkillNames,
   type SkillSummary,
 } from "./skill-data"
 
-const SIDEBAR_ORDER = 250
-const COLLAPSED_KEY = "opencode-skills-tui.collapsed"
-const LOADED_ONLY_KEY = "opencode-skills-tui.loaded-only"
-const NPM_PACKAGE = "opencode-skills-tui"
-// Must match the "xlarge" dialog width in opencode's ui/dialog.tsx.
-const PREVIEW_WIDTH = 116
+const EMPTY_LOADED_SKILLS = new Set<string>()
 
-// opencode's Dialog panel is auto-height, so a flexGrow-only layout collapses
-// to content height and the scrollbox ends up with nothing to scroll. Give the
-// content an explicit height. The full-screen shield owns all mouse input:
-// events inside the content box are swallowed, and a full click (down + up)
-// outside it closes the dialog — mirroring opencode's own backdrop dismiss,
-// but on our terms so the mouseup of the opening right-click (whose mousedown
-// happened before the dialog existed) never closes it.
-function DialogShield(props: {
-  width: number
-  theme: Accessor<TuiThemeCurrent>
-  onClose: () => void
-  children: JSX.Element
-}) {
-  const dims = useTerminalDimensions()
-  const rows = () => Math.max(6, dims().height - 4)
-  const inContent = (x: number, y: number) => {
-    const left = Math.floor((dims().width - props.width) / 2)
-    return x >= left && x < left + props.width && y >= 2 && y < 2 + rows()
+function createMarkdownSyntax(theme: ResolvedTheme) {
+  const markdown = theme.markdown
+  return SyntaxStyle.fromStyles({
+    default: { fg: markdown.text },
+    "markup.heading": { fg: markdown.heading, bold: true },
+    "markup.strong": { fg: markdown.strong, bold: true },
+    "markup.italic": { fg: markdown.emphasis, italic: true },
+    "markup.list": { fg: markdown.listItem },
+    "markup.quote": { fg: markdown.blockQuote, italic: true },
+    "markup.raw": { fg: markdown.code },
+    "markup.link": { fg: markdown.link, underline: true },
+    "markup.link.url": { fg: markdown.link, underline: true },
+    "markup.link.label": { fg: markdown.linkText, underline: true },
+    "markup.strikethrough": { fg: theme.text.muted, dim: true },
+  })
+}
+
+function enableMarkdownWrapping(renderable: Renderable) {
+  if (renderable instanceof CodeRenderable) renderable.wrapMode = "char"
+  for (const child of renderable.getChildren()) {
+    if (isRenderable(child)) enableMarkdownWrapping(child)
   }
-  let downOutside = false
-  const onDown = (event: MouseEvent) => {
-    event.stopPropagation()
-    downOutside = !inContent(event.x, event.y)
-  }
-  const onUp = (event: MouseEvent) => {
-    event.stopPropagation()
-    if (downOutside && !inContent(event.x, event.y)) {
-      props.onClose()
-    }
-  }
-  const swallow = (event: MouseEvent) => event.stopPropagation()
-  // Absolute coordinates are relative to the parent's padding box — which is
-  // opencode's dialog panel, itself offset to the screen center. Negative
-  // offsets undo the panel origin so the shield covers the whole screen.
-  return (
-    <box
-      position="absolute"
-      left={-Math.floor((dims().width - props.width) / 2)}
-      top={-Math.floor(dims().height / 4)}
-      width={dims().width}
-      height={dims().height}
-      flexDirection="column"
-      alignItems="center"
-      paddingTop={2}
-      onMouseDown={onDown}
-      onMouseUp={onUp}
-      onMouseScroll={swallow}
-    >
-      <box
-        flexDirection="column"
-        rowGap={1}
-        paddingBottom={1}
-        paddingLeft={8}
-        paddingRight={8}
-        width={props.width}
-        height={rows()}
-        backgroundColor={props.theme().backgroundPanel}
-      >
-        {props.children}
-      </box>
-    </box>
-  )
 }
 
 function SkillPreviewDialog(props: {
   skill: SkillSummary
-  theme: Accessor<TuiThemeCurrent>
-  onClose: () => void
+  theme: Accessor<ResolvedTheme>
 }) {
+  const dims = useTerminalDimensions()
+  const syntaxStyle = createMarkdownSyntax(props.theme())
+  onCleanup(() => syntaxStyle.destroy())
+
   return (
-    <DialogShield width={PREVIEW_WIDTH} theme={props.theme} onClose={props.onClose}>
-      <box flexDirection="row" justifyContent="space-between" columnGap={2}>
-        <text style={{ fg: props.theme().text }}>
+    <box
+      flexDirection="column"
+      rowGap={1}
+      paddingBottom={1}
+      paddingLeft={2}
+      paddingRight={2}
+      width="100%"
+      height={Math.max(1, dims().height - 4)}
+      backgroundColor={props.theme().surface("dialog").background.base}
+    >
+      <box>
+        <text style={{ fg: props.theme().text.base }}>
           <strong>{props.skill.name}</strong>
         </text>
-        <text style={{ fg: props.theme().textMuted }}>esc to close</text>
       </box>
-      <scrollbox flexGrow={1} minHeight={0}>
-        <markdown content={props.skill.content} syntaxStyle={SyntaxStyle.create()} />
-      </scrollbox>
-    </DialogShield>
-  )
-}
-
-// All-time usage counts per skill, sorted by count. Deleted skills whose
-// counts are still persisted show up as "(deleted)".
-function SkillStatsDialog(props: {
-  skills: SkillSummary[]
-  counts: Accessor<Map<string, number>>
-  theme: Accessor<TuiThemeCurrent>
-  onClose: () => void
-}) {
-  const exists = (name: string) => props.skills.some((skill) => skill.name === name)
-  const entries = () => {
-    const merged = new Map(props.counts())
-    for (const skill of props.skills) {
-      if (!merged.has(skill.name)) {
-        merged.set(skill.name, 0)
-      }
-    }
-    return [...merged.entries()].sort(
-      (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
-    )
-  }
-  return (
-    <DialogShield width={PREVIEW_WIDTH} theme={props.theme} onClose={props.onClose}>
-      <box flexDirection="row" justifyContent="space-between" columnGap={2}>
-        <text style={{ fg: props.theme().text }}>
-          <strong>Skill usage</strong>
-        </text>
-        <text style={{ fg: props.theme().textMuted }}>esc to close</text>
-      </box>
-      <scrollbox flexGrow={1} minHeight={0}>
-        <Show
-          when={entries().length > 0}
-          fallback={<text style={{ fg: props.theme().textMuted }}>No skill usage recorded yet</text>}
-        >
-          <For each={entries()}>
-            {([name, count]) => (
-              <box flexDirection="row" justifyContent="space-between" columnGap={2}>
-                <text style={{ fg: exists(name) ? props.theme().text : props.theme().textMuted }}>
-                  {exists(name) ? name : `${name} (deleted)`}
-                </text>
-                <text style={{ fg: props.theme().textMuted }}>{String(count)}</text>
-              </box>
-            )}
-          </For>
-        </Show>
-      </scrollbox>
-    </DialogShield>
-  )
-}
-
-declare const __PLUGIN_VERSION__: string
-
-// opencode caches npm plugins per spec and never re-resolves @latest, so a
-// published update stays invisible until the user deletes the cache. Check
-// the registry once at startup and point them at the cache dir.
-const checkForUpdates = async (api: Awaited<Parameters<TuiPlugin>[0]>) => {
-  try {
-    const res = await fetch(`https://registry.npmjs.org/${NPM_PACKAGE}/latest`, {
-      signal: AbortSignal.timeout(5000),
-    })
-    const manifest = (await res.json()) as { version?: string }
-    if (manifest.version && manifest.version !== __PLUGIN_VERSION__) {
-      api.ui.toast({
-        variant: "info",
-        title: NPM_PACKAGE,
-        message: `Version ${manifest.version} is available. Delete ~/.cache/opencode/packages/${NPM_PACKAGE}@latest and restart opencode to update.`,
-        duration: 10000,
-      })
-    }
-  } catch {
-    // Offline or registry unreachable: silently skip.
-  }
-}
-
-const tui: TuiPlugin = async (api) => {
-  const [skills, setSkills] = createSignal<SkillSummary[]>([])
-  const [loadVersion, setLoadVersion] = createSignal(0)
-  const [collapsed, setCollapsed] = createSignal(Boolean(api.kv.get(COLLAPSED_KEY, false)))
-  const [loadedOnly, setLoadedOnly] = createSignal(Boolean(api.kv.get(LOADED_ONLY_KEY, false)))
-  // All-time usage counters. Deliberately NOT stored via api.kv: kv rewrites
-  // the whole shared kv.json from each process's memory snapshot on every
-  // set, so concurrent opencode instances (and other plugins) would clobber
-  // each other's counts. A dedicated file, written read-merge-write on every
-  // count, keeps the numbers visible across instances.
-  type UsageData = { counts: Map<string, number>; counted: Map<string, Set<string>> }
-  const usageFile = path.join(api.state.path.state, "opencode-skills-tui-usage.json")
-
-  // The file on disk is the source of truth; the maps below are only a
-  // per-process dedup/display cache hydrated at startup.
-  function readUsage(): UsageData {
-    const counts = new Map<string, number>()
-    const counted = new Map<string, Set<string>>()
-    try {
-      const parsed = JSON.parse(readFileSync(usageFile, "utf8")) as {
-        counts?: Record<string, unknown>
-        counted?: Record<string, unknown>
-      }
-      for (const [name, count] of Object.entries(parsed.counts ?? {})) {
-        if (typeof count === "number" && Number.isFinite(count)) {
-          counts.set(name, count)
-        }
-      }
-      for (const [sessionID, ids] of Object.entries(parsed.counted ?? {})) {
-        if (Array.isArray(ids)) {
-          counted.set(sessionID, new Set(ids.filter((id) => typeof id === "string")))
-        }
-      }
-    } catch {
-      // Missing or corrupt file: start fresh.
-    }
-    return { counts, counted }
-  }
-
-  function writeUsage(usage: UsageData) {
-    try {
-      writeFileSync(
-        usageFile,
-        JSON.stringify({
-          counts: Object.fromEntries(usage.counts),
-          counted: Object.fromEntries([...usage.counted].map(([sessionID, ids]) => [sessionID, [...ids]])),
-        }),
-      )
-    } catch (error) {
-      console.error("Failed to persist skill usage stats", error)
-    }
-  }
-
-  // Part IDs already counted, per session. Guards against double-counting:
-  // message.part.updated fires repeatedly per part while streaming, and the
-  // post-restart server backfill re-yields parts that live scans already saw.
-  const initial = readUsage()
-  const countedParts = initial.counted
-  const loadedBySession = new Map<string, Set<string>>()
-  const scannedBySession = new Map<string, Set<string>>()
-  const fallbackAttempted = new Set<string>()
-  let refreshTimer: ReturnType<typeof setTimeout> | undefined
-  const loadedRefreshTimers = new Set<ReturnType<typeof setTimeout>>()
-  let visibleSessionID: string | undefined
-
-  const toggleCollapsed = () => {
-    const next = !collapsed()
-    setCollapsed(next)
-    api.kv.set(COLLAPSED_KEY, next)
-  }
-
-  const toggleLoadedOnly = () => {
-    const next = !loadedOnly()
-    setLoadedOnly(next)
-    api.kv.set(LOADED_ONLY_KEY, next)
-    api.ui.toast({
-      variant: "info",
-      title: "Skills",
-      message: next ? "Sidebar shows loaded skills only" : "Sidebar shows all skills",
-      duration: 2000,
-    })
-  }
-
-  const openSkillPreview = (skill: SkillSummary) => {
-    // replace() resets the stored size to "medium", so setSize must come after
-    // it or the preview renders 60 columns wide instead of xlarge.
-    api.ui.dialog.replace(
-      () => <SkillPreviewDialog skill={skill} theme={() => api.theme.current} onClose={() => api.ui.dialog.clear()} />,
-    )
-    api.ui.dialog.setSize("xlarge")
-  }
-
-  const getLoadedSkills = (sessionID: string) => {
-    const loaded = loadedBySession.get(sessionID)
-    const scanned = scannedBySession.get(sessionID)
-
-    if (loaded && scanned) {
-      return loaded
-    }
-
-    const nextLoaded = loaded ?? new Set<string>()
-    const nextScanned = scanned ?? new Set<string>()
-    loadedBySession.set(sessionID, nextLoaded)
-    scannedBySession.set(sessionID, nextScanned)
-    const messages = api.state.session.messages(sessionID)
-    scanLoadedSkillNames(api, sessionID, nextLoaded, nextScanned, skills(), countParts(sessionID))
-    // TUI state can be empty right after a restart (lazy loading). Fall back
-    // to the server once per session so history-loaded skills still show.
-    if (messages.length === 0 && !fallbackAttempted.has(sessionID)) {
-      fallbackAttempted.add(sessionID)
-      void fetchLoadedSkillNames(
-        api,
-        sessionID,
-        nextLoaded,
-        nextScanned,
-        skills(),
-        countParts(sessionID),
-      )
-        .then((changed) => {
-          if (changed) setLoadVersion((value) => value + 1)
-        })
-        .catch(() => {})
-    }
-
-    return nextLoaded
-  }
-
-  const refreshLoadedSkills = (sessionID: string) => {
-    const loaded = loadedBySession.get(sessionID)
-    const scanned = scannedBySession.get(sessionID)
-
-    if (loaded && scanned) {
-      if (scanLoadedSkillNames(api, sessionID, loaded, scanned, skills(), countParts(sessionID))) {
-        setLoadVersion((value) => value + 1)
-      }
-      return
-    }
-
-    getLoadedSkills(sessionID)
-    setLoadVersion((value) => value + 1)
-  }
-
-  const scheduleRefreshLoadedSkills = (sessionID: string, delay = 0) => {
-    const timer = setTimeout(() => {
-      loadedRefreshTimers.delete(timer)
-      refreshLoadedSkills(sessionID)
-    }, delay)
-
-    loadedRefreshTimers.add(timer)
-  }
-
-  const markLoaded = (sessionID: string, skillName: string) => {
-    const loaded = getLoadedSkills(sessionID)
-    const sizeBefore = loaded.size
-
-    loaded.add(skillName)
-
-    if (loaded.size !== sizeBefore) {
-      setLoadVersion((value) => value + 1)
-    }
-  }
-
-  const recordSkillLoad = (sessionID: string, part: Part): string | undefined => {
-    const skillName = extractLoadedSkillName(part, skills())
-    // Only count skills that still exist: calls to deleted or hallucinated
-    // skill names must not inflate the stats.
-    if (!skillName || !part.id || !skills().some((skill) => skill.name === skillName)) {
-      return undefined
-    }
-
-    let counted = countedParts.get(sessionID)
-    if (!counted) {
-      counted = new Set()
-      countedParts.set(sessionID, counted)
-    }
-    if (!counted.has(part.id)) {
-      // Disk is authoritative: read fresh, re-check dedup, +1, write — so an
-      // increment lands even when another opencode instance counted before.
-      // ponytail: no file lock, so two processes incrementing in the same
-      // millisecond can interleave and lose one increment; add a lockfile
-      // with retry if stats ever need more than eventual accuracy.
-      const disk = readUsage()
-      if (disk.counted.get(sessionID)?.has(part.id)) {
-        counted.add(part.id)
-        return skillName
-      }
-      const ids = disk.counted.get(sessionID) ?? new Set<string>()
-      ids.add(part.id)
-      disk.counted.set(sessionID, ids)
-      disk.counts.set(skillName, (disk.counts.get(skillName) ?? 0) + 1)
-      writeUsage(disk)
-      counted.add(part.id)
-    }
-    return skillName
-  }
-
-  const countParts = (sessionID: string) => (part: Part) => recordSkillLoad(sessionID, part)
-
-  const openSkillStats = () => {
-    // Read from disk so stats written by other opencode instances show up.
-    const snapshot = readUsage().counts
-    // replace() resets the stored size to "medium", so setSize must come after
-    // it or the preview renders 60 columns wide instead of xlarge.
-    api.ui.dialog.replace(
-      () => (
-        <SkillStatsDialog
-          skills={skills()}
-          counts={() => snapshot}
-          theme={() => api.theme.current}
-          onClose={() => api.ui.dialog.clear()}
+      <scrollbox width="100%" flexGrow={1} minHeight={0} paddingRight={1} scrollX={false}>
+        <markdown
+          ref={enableMarkdownWrapping}
+          width="100%"
+          content={props.skill.content}
+          syntaxStyle={syntaxStyle}
+          tableOptions={{ wrapMode: "char" }}
         />
-      ),
-    )
-    api.ui.dialog.setSize("xlarge")
-  }
+      </scrollbox>
+    </box>
+  )
+}
 
-  const refreshSkills = async () => {
-    try {
-      setSkills(await loadAvailableSkills(api))
-      // Content-based matching needs the skills list; rescan messages that
-      // were scanned before the list (or a newer list) was available.
-      scannedBySession.clear()
-      for (const sessionID of loadedBySession.keys()) {
-        refreshLoadedSkills(sessionID)
-      }
-      setLoadVersion((value) => value + 1)
-    } catch (error) {
-      api.ui.toast({
-        variant: "error",
-        title: "Skills",
-        message: `Failed to load skills: ${error instanceof Error ? error.message : String(error)}`,
-        duration: 5000,
+export default Plugin.define({
+  id: "opencode-skills-tui",
+  setup(ctx) {
+    const [skills, setSkills] = createSignal<SkillSummary[]>([])
+    const [prefs, mutatePrefs] = ctx.storage.store<{ collapsed: boolean }>("prefs", {
+      initial: { collapsed: false },
+    })
+
+    const [loadedBySession, setLoadedBySession] = createSignal(new Map<string, Set<string>>())
+    const backfilled = new Set<string>()
+    const backfilling = new Set<string>()
+
+    const markLoaded = (sessionID: string, skillName: string) => {
+      setLoadedBySession((current) => {
+        const loaded = current.get(sessionID)
+        if (loaded?.has(skillName)) return current
+
+        const next = new Map(current)
+        next.set(sessionID, new Set(loaded).add(skillName))
+        return next
       })
     }
-  }
 
-  const scheduleRefreshSkills = (delay = 0) => {
-    if (refreshTimer) {
-      clearTimeout(refreshTimer)
+    const ensureBackfill = (sessionID: string) => {
+      if (backfilled.has(sessionID) || backfilling.has(sessionID)) return
+
+      backfilling.add(sessionID)
+      void backfillLoadedSkills(ctx, sessionID, (skillName) => markLoaded(sessionID, skillName))
+        .then(() => backfilled.add(sessionID))
+        .catch(() => {
+          // Log unreachable: live events still mark loads going forward.
+        })
+        .finally(() => backfilling.delete(sessionID))
     }
 
-    refreshTimer = setTimeout(() => {
-      refreshTimer = undefined
+    const toggleCollapsed = () => {
+      void mutatePrefs((draft) => {
+        draft.collapsed = !draft.collapsed
+      })
+    }
+
+    const openSkillPreview = (skill: SkillSummary) => {
+      // dialog.set() targets the active dialog, so show it first.
+      ctx.ui.dialog.show(() => (
+        <SkillPreviewDialog skill={skill} theme={() => ctx.theme} />
+      ))
+      ctx.ui.dialog.set({ size: "xlarge", centered: true })
+    }
+
+    const refreshSkills = async () => {
+      try {
+        setSkills(await loadAvailableSkills(ctx))
+      } catch (error) {
+        ctx.ui.toast.show({
+          variant: "error",
+          title: "Skills",
+          message: `Failed to load skills: ${error instanceof Error ? error.message : String(error)}`,
+          duration: 5000,
+        })
+      }
+    }
+
+    void refreshSkills()
+
+    // OpenCode may initialize TUI plugins before location data is ready.
+    // One delayed retry keeps skill discovery from getting stuck empty.
+    const initialRefreshTimer = setTimeout(() => void refreshSkills(), 250)
+
+    const unregisterSkillUpdated = ctx.data.on("skill.updated", () => {
       void refreshSkills()
-    }, delay)
-  }
+    })
 
-  void refreshSkills()
-  void checkForUpdates(api)
+    const unregisterProjectUpdated = ctx.data.on("project.updated", () => {
+      void refreshSkills()
+    })
 
-  // OpenCode may initialize TUI plugins before workspace/worktree state is fully ready.
-  // Refresh after readiness events so skill discovery does not get stuck empty.
-  scheduleRefreshSkills(250)
+    const unregisterSkillActivated = ctx.data.on("session.skill.activated", (event) => {
+      markLoaded(event.data.sessionID, event.data.name)
+    })
 
-  const unregisterMessagePartUpdated = api.event.on("message.part.updated", (event) => {
-    const skillName = recordSkillLoad(event.properties.sessionID, event.properties.part)
-    if (skillName) {
-      markLoaded(event.properties.sessionID, skillName)
-    }
-  })
+    const unregisterSessionDeleted = ctx.data.on("session.deleted", (event) => {
+      const sessionID = event.data.sessionID
+      setLoadedBySession((current) => {
+        if (!current.has(sessionID)) return current
+        const next = new Map(current)
+        next.delete(sessionID)
+        return next
+      })
+      backfilled.delete(sessionID)
+    })
 
-  const unregisterSessionDeleted = api.event.on("session.deleted", (event) => {
-    const removed =
-      loadedBySession.delete(event.properties.sessionID) ||
-      scannedBySession.delete(event.properties.sessionID)
-    // countedParts is deliberately kept: counts are global and session
-    // deletion never touches them. ponytail: bookkeeping for dead sessions
-    // just accumulates in the usage file (~50 bytes/session) — upgrade: if it
-    // ever grows noticeably (> ~1MB or > 10k counted entries), prune counted
-    // entries whose session no longer exists via api.client.session.list().
-    if (removed) {
-      setLoadVersion((value) => value + 1)
-    }
-  })
-
-  const unregisterProjectUpdated = api.event.on("project.updated", () => {
-    scheduleRefreshSkills()
-  })
-
-  const unregisterWorkspaceReady = api.event.on("workspace.ready", () => {
-    scheduleRefreshSkills()
-  })
-
-  const unregisterWorktreeReady = api.event.on("worktree.ready", () => {
-    scheduleRefreshSkills()
-  })
-
-  const unregisterKeymap = api.keymap.registerLayer({
-    commands: [
-      {
-        name: "skills-toggle",
-        namespace: "palette",
-        title: "Skills Toggle",
-        desc: "Toggle showing only loaded skills in the sidebar",
-        category: "Skills",
-        slashName: "skills-toggle",
-        run() {
-          toggleLoadedOnly()
-        },
-      },
-      {
-        name: "skills-stats",
-        namespace: "palette",
-        title: "Skills Stats",
-        desc: "Show all-time usage counts per skill",
-        category: "Skills",
-        slashName: "skills-stats",
-        run() {
-          openSkillStats()
-        },
-      },
-    ],
-  })
-
-  api.lifecycle.onDispose(() => {
-    if (refreshTimer) {
-      clearTimeout(refreshTimer)
-    }
-
-    for (const timer of loadedRefreshTimers) {
-      clearTimeout(timer)
-    }
-
-    loadedRefreshTimers.clear()
-
-    unregisterMessagePartUpdated()
-    unregisterSessionDeleted()
-    unregisterProjectUpdated()
-    unregisterWorkspaceReady()
-    unregisterWorktreeReady()
-    unregisterKeymap()
-  })
-
-  api.slots.register({
-    order: SIDEBAR_ORDER,
-    slots: {
-      sidebar_content: (_ctx, props) => {
-        if (visibleSessionID !== props.session_id) {
-          visibleSessionID = props.session_id
-          // Session history can hydrate just after navigation. Immediate scans
-          // happen through the side bar render and message/session events; this
-          // is a single slower retry to backfill anything hydrated afterwards.
-          scheduleRefreshLoadedSkills(props.session_id, 500)
-        }
-
-        loadVersion()
+    const unregisterSlot = ctx.ui.slot({
+      append: "sidebar.content",
+      render: (input) => {
+        ensureBackfill(input.sessionID)
 
         return (
           <SkillsPanel
             skills={skills}
-            // Reading loadVersion() here seeds the panel's memos with a
-            // reactive dependency — getLoadedSkills() itself is plain data.
-            loadedNames={() => {
-              loadVersion()
-              return getLoadedSkills(props.session_id)
-            }}
-            loadedOnly={loadedOnly}
-            theme={() => api.theme.current}
-            collapsed={collapsed}
+            loadedNames={() => loadedBySession().get(input.sessionID) ?? EMPTY_LOADED_SKILLS}
+            theme={() => ctx.theme}
+            collapsed={() => prefs.collapsed}
             onToggle={toggleCollapsed}
             onSkillPreview={openSkillPreview}
           />
         )
       },
-    },
-  })
-}
+    })
 
-const plugin: TuiPluginModule & { id: string } = {
-  id: "opencode-skills-tui",
-  tui,
-}
+    return () => {
+      clearTimeout(initialRefreshTimer)
 
-export default plugin
+      unregisterSlot()
+      unregisterSkillUpdated()
+      unregisterProjectUpdated()
+      unregisterSkillActivated()
+      unregisterSessionDeleted()
+    }
+  },
+})

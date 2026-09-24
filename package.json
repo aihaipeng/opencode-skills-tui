@@ -1,6 +1,6 @@
 {
   "name": "opencode-skills-tui",
-  "version": "0.4.4",
+  "version": "1.0.0",
   "description": "OpenCode TUI plugin that shows skills and loaded state in the sidebar",
   "type": "module",
   "license": "MIT",
@@ -21,33 +21,37 @@
     "sidebar"
   ],
   "files": [
-    "dist",
+    "index.ts",
+    "tui.tsx",
+    "src",
     "README.md",
     "README.zh-CN.md",
     "LICENSE"
   ],
   "exports": {
-    ".": {
-      "import": "./dist/tui.js",
-      "types": "./dist/tui.d.ts"
-    },
-    "./tui": {
-      "import": "./dist/tui.js",
-      "types": "./dist/tui.d.ts"
-    }
+    ".": "./index.ts",
+    "./tui": "./tui.tsx"
   },
   "scripts": {
-    "build": "bun run scripts/build.mjs && tsc --emitDeclarationOnly",
+    "build": "bun run typecheck",
+    "test": "bun test",
     "typecheck": "tsc --noEmit",
     "prepare": "bun run build"
   },
   "dependencies": {
-    "@opencode-ai/plugin": "^1.14.29",
-    "@opentui/core": "^0.1.105",
-    "@opentui/solid": "^0.1.105",
-    "solid-js": "^1.9.11"
+    "@opencode/plugin": "^2.0.16"
+  },
+  "peerDependencies": {
+    "@opencode/theme": "2.0.16",
+    "@opentui/core": ">=0.5.10",
+    "@opentui/solid": ">=0.5.10",
+    "solid-js": ">=1.9.0"
   },
   "devDependencies": {
+    "@opencode/theme": "2.0.16",
+    "@opentui/core": "^0.5.10",
+    "@opentui/solid": "^0.5.10",
+    "solid-js": "^1.9.11",
     "typescript": "^5.8.2"
   }
 }
