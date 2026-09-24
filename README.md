@@ -23,6 +23,8 @@ A skill list for your [**OpenCode V2**](https://opencode.ai/v2/docs/) sidebar. S
 
 ## 📦 Install
 
+Unversioned installs target OpenCode V2. OpenCode V1 users should stay on `opencode-skills-tui@0.4.4`.
+
 ### Let your Agent do it (recommended)
 
 Paste this into OpenCode or your favorite coding Agent:

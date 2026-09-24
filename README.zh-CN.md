@@ -23,6 +23,8 @@
 
 ## 📦 安装
 
+不带版本号的安装面向 OpenCode V2。OpenCode V1 用户请继续使用 `opencode-skills-tui@0.4.4`。
+
 ### 让 Agent 帮你装（推荐）
 
 把下面这段话发给 OpenCode 或你常用的编程 Agent：
