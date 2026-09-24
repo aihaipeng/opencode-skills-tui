@@ -81,8 +81,9 @@ cd opencode-skills-tui
 bun install
 bun run typecheck
 bun run test
+bun run test:package
 ```
 
-OpenCode 会直接编译 TSX 入口，并重载受监控的文件。改动没被检测到时，再重启确认。测试覆盖技能列表整理和已加载技能置顶排序。
+作为本地插件加载仓库前，请先运行 `bun run build`。npm 发布包包含预编译的 Solid 代码，确保点击后面板能更新。`bun run test:package` 会从 `node_modules` 路径测试实际 npm 压缩包。
 
 [插件安装](https://opencode.ai/v2/docs/cli/plugins) · [V2 插件 API](https://opencode.ai/v2/docs/build/plugins/cli) · [MIT 许可证](LICENSE)

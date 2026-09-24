@@ -1,3 +1,3 @@
-// TUI entrypoint for local/plugin-directory loading: the CLI plugin loader
-// probes <plugin-dir>/tui next to the server entrypoint (index.ts).
-export { default } from "./src/tui"
+// The CLI probes this file beside index.ts, including in installed npm packages.
+// Local directory installs must run `bun run build` first.
+export { default } from "./dist/tui.js"

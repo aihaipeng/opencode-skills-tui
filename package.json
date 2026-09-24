@@ -1,6 +1,6 @@
 {
   "name": "opencode-skills-tui",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "OpenCode TUI plugin that shows skills and loaded state in the sidebar",
   "type": "module",
   "license": "MIT",
@@ -23,20 +23,21 @@
   "files": [
     "index.ts",
     "tui.tsx",
-    "src",
+    "dist",
     "README.md",
     "README.zh-CN.md",
     "LICENSE"
   ],
   "exports": {
     ".": "./index.ts",
-    "./tui": "./tui.tsx"
+    "./tui": "./dist/tui.js"
   },
   "scripts": {
-    "build": "bun run typecheck",
-    "test": "bun test",
+    "build": "bun run typecheck && bun scripts/build.ts",
+    "test": "bun test --conditions=browser --preload @opentui/solid/preload",
+    "test:package": "bun run build && bun scripts/test-package.ts",
     "typecheck": "tsc --noEmit",
-    "prepare": "bun run build"
+    "prepack": "bun run build"
   },
   "dependencies": {
     "@opencode/plugin": "^2.0.16"
