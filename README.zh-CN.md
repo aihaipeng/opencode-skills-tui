@@ -10,7 +10,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
-给 [**OpenCode V2**](https://opencode.ai/v2/docs/) 的侧边栏加一份技能列表。看看有哪些技能、当前会话加载了哪些，再点开 SKILL.md，在终端里就能搞定。
+给 [**OpenCode**](https://opencode.ai) 的侧边栏加一份技能列表。看看有哪些技能、当前会话加载了哪些，再点开 SKILL.md，在终端里就能搞定。
 
 ![技能面板演示](assets/demo.gif)
 
@@ -23,20 +23,35 @@
 
 ## 📦 安装
 
-不带版本号的安装面向 OpenCode V2。OpenCode V1 用户请继续使用 `opencode-skills-tui@0.4.4`。
+请根据已安装的 OpenCode 版本选择下方指导。OpenCode V1 使用固定的旧版插件，V2 使用当前版本。
 
 ### 让 Agent 帮你装（推荐）
 
 把下面这段话发给 OpenCode 或你常用的编程 Agent：
 
 ```text
-请按照这份 README 的手动安装部分，为 OpenCode V2 安装 opencode-skills-tui，并保留我已有的配置：
-https://raw.githubusercontent.com/aihaipeng/opencode-skills-tui/main/README.md
+请按照这份 README 的手动安装部分安装 opencode-skills-tui。先检查我已安装的 OpenCode 版本，再选择对应指导，保留已有配置：
+https://raw.githubusercontent.com/aihaipeng/opencode-skills-tui/main/README.zh-CN.md
 ```
 
 ### 手动安装
 
-在 `~/.config/opencode/cli.json` 中添加插件，保留已有配置：
+先检查你正在使用的 OpenCode 版本：
+
+```bash
+opencode --version
+```
+
+| OpenCode 版本 | 插件包 | 配置文件与字段 |
+| --- | --- | --- |
+| `1.x`（V1） | `opencode-skills-tui@0.4.4` | `~/.config/opencode/tui.json` → `plugin` |
+| `2.x`（V2） | `opencode-skills-tui` | `~/.config/opencode/cli.json` → `plugins` |
+
+如果无法确定版本，请先确认再修改配置。将对应条目合并到已有文件，保留其他插件和设置；若已配置本插件，更新原条目即可，避免重复添加。
+
+#### OpenCode V2
+
+在 `~/.config/opencode/cli.json` 中添加以下条目：
 
 ```json
 {
@@ -50,6 +65,23 @@ https://raw.githubusercontent.com/aihaipeng/opencode-skills-tui/main/README.md
 ```
 
 OpenCode 会自动从 npm 下载插件，并重载受监控的配置变更。
+
+#### OpenCode V1
+
+在 `~/.config/opencode/tui.json` 中添加固定版本：
+
+```json
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": [
+    "opencode-skills-tui@0.4.4"
+  ]
+}
+```
+
+重启 OpenCode 后会自动下载并加载插件。使用 V1 时，即使出现更新提示也请保留 `@0.4.4`，不带版本号会安装面向 V2 的版本。
+
+下方使用说明面向 V2。V1 需要右键点击技能来预览，其他功能请参考 [V1 使用说明](https://github.com/aihaipeng/opencode-skills-tui/blob/v0.4.4/README.zh-CN.md)。
 
 ## 🖱️ 怎么用
 
@@ -66,7 +98,7 @@ OpenCode 会自动从 npm 下载插件，并重载受监控的配置变更。
 
 ## 🔧 小提示
 
-- **没有 Skills 面板？** 检查 OpenCode 版本和 `plugins` 配置，再重启确认。运行 `opencode --print-logs` 可查看插件加载日志。
+- **没有 Skills 面板？** 检查 OpenCode 版本及上方对应配置，再重启确认。运行 `opencode --print-logs` 可查看插件加载日志。
 - **列表是空的？** 确认 OpenCode 能发现当前项目或全局配置中的技能。
 - **已加载的技能没变绿？** 切换到对应会话，稍等片刻，让加载状态恢复。
 - **改动没生效？** V2 会重载受监控的插件和配置文件；未受监控的本地依赖可能仍需重启。

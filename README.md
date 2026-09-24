@@ -10,7 +10,7 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
-A skill list for your [**OpenCode V2**](https://opencode.ai/v2/docs/) sidebar. See what's available, check what the current session has loaded, and read SKILL.md without leaving the terminal.
+A skill list for your [**OpenCode**](https://opencode.ai) sidebar. See what's available, check what the current session has loaded, and read SKILL.md without leaving the terminal.
 
 ![Skills panel demo](assets/demo.gif)
 
@@ -23,20 +23,35 @@ A skill list for your [**OpenCode V2**](https://opencode.ai/v2/docs/) sidebar. S
 
 ## 📦 Install
 
-Unversioned installs target OpenCode V2. OpenCode V1 users should stay on `opencode-skills-tui@0.4.4`.
+Choose the instructions below for your installed OpenCode version. OpenCode V1 uses a pinned legacy release; V2 uses the current release.
 
 ### Let your Agent do it (recommended)
 
 Paste this into OpenCode or your favorite coding Agent:
 
 ```text
-Install opencode-skills-tui for OpenCode V2 using the manual installation section in this README. Preserve my existing configuration:
+Install opencode-skills-tui using the manual installation section in this README. Check my installed OpenCode version and follow the matching instructions. Preserve my existing configuration:
 https://raw.githubusercontent.com/aihaipeng/opencode-skills-tui/main/README.md
 ```
 
 ### Manual installation
 
-Add this plugin to `~/.config/opencode/cli.json`, keeping your existing settings:
+First check the OpenCode version you use:
+
+```bash
+opencode --version
+```
+
+| OpenCode version | Plugin package | Configuration file and field |
+| --- | --- | --- |
+| `1.x` (V1) | `opencode-skills-tui@0.4.4` | `~/.config/opencode/tui.json` → `plugin` |
+| `2.x` (V2) | `opencode-skills-tui` | `~/.config/opencode/cli.json` → `plugins` |
+
+If the version cannot be determined, confirm it before editing the configuration. Merge the matching entry into your existing file, preserving other plugins and settings. If this plugin is already listed, update that entry instead of adding a duplicate.
+
+#### OpenCode V2
+
+Add the following entry to `~/.config/opencode/cli.json`:
 
 ```json
 {
@@ -50,6 +65,23 @@ Add this plugin to `~/.config/opencode/cli.json`, keeping your existing settings
 ```
 
 OpenCode handles the npm download and reloads watched configuration changes.
+
+#### OpenCode V1
+
+Add the pinned version to `~/.config/opencode/tui.json`:
+
+```json
+{
+  "$schema": "https://opencode.ai/tui.json",
+  "plugin": [
+    "opencode-skills-tui@0.4.4"
+  ]
+}
+```
+
+Restart OpenCode to download and load the plugin. Keep `@0.4.4` pinned while using V1, even if an update notice appears; an unversioned package selects the V2 release.
+
+The usage below describes V2. In V1, right-click a skill to preview it; see the [V1 usage guide](https://github.com/aihaipeng/opencode-skills-tui/blob/v0.4.4/README.md) for its features.
 
 ## 🖱️ Click around
 
@@ -66,7 +98,7 @@ Green means OpenCode has loaded that skill in the current session. Opening its p
 
 ## 🔧 A few tips
 
-- **No Skills panel?** Check your OpenCode version and the `plugins` entry, then restart. Run `opencode --print-logs` to inspect plugin loading.
+- **No Skills panel?** Check your OpenCode version and its matching configuration above, then restart. Run `opencode --print-logs` to inspect plugin loading.
 - **No skills listed?** Confirm that OpenCode can discover skills for the current project or global configuration.
 - **Loaded skill not green?** Switch to the relevant session and give it a moment to restore the loaded state.
 - **Changes not showing up?** V2 reloads watched plugin/config files. Unwatched local dependencies may still need a restart.
