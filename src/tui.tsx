@@ -10,6 +10,7 @@ import type { ResolvedTheme } from "@opencode/theme/tui"
 import { SkillsPanel } from "./components/skills-panel"
 import {
   backfillLoadedSkills,
+  extractMessageSkillLoads,
   loadAvailableSkills,
   type SkillSummary,
 } from "./skill-data"
@@ -107,7 +108,7 @@ export default Plugin.define({
       void backfillLoadedSkills(ctx, sessionID, (skillName) => markLoaded(sessionID, skillName))
         .then(() => backfilled.add(sessionID))
         .catch(() => {
-          // Log unreachable: live events still mark loads going forward.
+          // History unreachable: live message scans still mark loads.
         })
         .finally(() => backfilling.delete(sessionID))
     }
@@ -153,10 +154,9 @@ export default Plugin.define({
       void refreshSkills()
     })
 
-    const unregisterSkillActivated = ctx.data.on("session.skill.activated", (event) => {
-      markLoaded(event.data.sessionID, event.data.name)
-    })
-
+    // OpenCode 2.0.16 does not emit durable skill activations for skill-tool
+    // loads (session event logs stay empty), so loads are detected from
+    // message data.
     const unregisterSessionDeleted = ctx.data.on("session.deleted", (event) => {
       const sessionID = event.data.sessionID
       setLoadedBySession((current) => {
@@ -172,6 +172,15 @@ export default Plugin.define({
       append: "sidebar.content",
       render: (input) => {
         ensureBackfill(input.sessionID)
+
+        // The message store is reactive: the host re-runs this claim when it
+        // changes, so scanning here catches loads live. The store holds a
+        // bounded window and markLoaded is idempotent, so rescans are cheap.
+        for (const message of ctx.data.session.message.list(input.sessionID)) {
+          for (const skillName of extractMessageSkillLoads(message)) {
+            markLoaded(input.sessionID, skillName)
+          }
+        }
 
         return (
           <SkillsPanel
@@ -192,7 +201,6 @@ export default Plugin.define({
       unregisterSlot()
       unregisterSkillUpdated()
       unregisterProjectUpdated()
-      unregisterSkillActivated()
       unregisterSessionDeleted()
     }
   },
