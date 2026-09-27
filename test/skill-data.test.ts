@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { extractMessageSkillLoads, sortSkillsByLoaded, toSummaries } from "../src/skill-data"
+import { backfillLoadedSkills, extractMessageSkillLoads, sortSkillsByLoaded, toSummaries } from "../src/skill-data"
+import type { Plugin } from "@opencode/plugin/tui"
 
 function assistantWithTools(entries: unknown[]) {
   return { id: "msg_tool", type: "assistant", content: entries }
@@ -108,4 +109,66 @@ describe("skill data", () => {
     expect(extractMessageSkillLoads(message)).toEqual(["handoff"])
     expect(extractMessageSkillLoads(plain)).toEqual([])
   })
+})
+
+
+test("extracts skill tags from every tool text part, not just the first", () => {
+  expect(extractMessageSkillLoads(assistantWithTools([{
+    type: "tool",
+    name: "skill",
+    state: {
+      status: "completed",
+      content: [
+        { type: "text", text: "Loading skill..." },
+        { type: "image", data: "not text" },
+        { type: "text", text: '<skill_content name="beta">\n# Beta' },
+        { type: "text", text: '<skill_content name="gamma">\n# Gamma' },
+      ],
+    },
+  }]))).toEqual(["beta", "gamma"])
+})
+
+test("backfills all history pages with the next cursor", async () => {
+  const calls: unknown[] = []
+  const loaded: string[] = []
+  const context = {
+    client: { message: { list: async (input: { cursor?: string }) => {
+      calls.push(input)
+      return input.cursor
+        ? { data: [{ type: "skill", name: "alpha" }], cursor: {} }
+        : { data: [{ type: "skill", name: "beta" }], cursor: { next: "older" } }
+    } } },
+  } as unknown as Plugin.Context
+  await backfillLoadedSkills(context, "session-1", (name) => loaded.push(name))
+  expect(calls).toEqual([
+    { sessionID: "session-1", limit: 200 },
+    { sessionID: "session-1", limit: 200, cursor: "older" },
+  ])
+  expect(loaded).toEqual(["beta", "alpha"])
+})
+
+test("cancelling an in-flight backfill discards its result and stops pagination", async () => {
+  const controller = new AbortController()
+  let calls = 0
+  let resolve!: (page: unknown) => void
+  const pending = new Promise((done) => { resolve = done })
+  const loaded: string[] = []
+  const context = {
+    client: { message: { list: () => { calls++; return pending } } },
+  } as unknown as Plugin.Context
+  const backfill = backfillLoadedSkills(context, "session-1", (name) => loaded.push(name), controller.signal)
+  controller.abort()
+  resolve({ data: [{ type: "skill", name: "alpha" }], cursor: { next: "older" } })
+  await backfill
+  expect(calls).toBe(1)
+  expect(loaded).toEqual([])
+  await backfillLoadedSkills(context, "session-1", (name) => loaded.push(name), controller.signal)
+  expect(calls).toBe(1)
+})
+
+test("backfill failures propagate so the caller can retry", async () => {
+  const context = {
+    client: { message: { list: async () => { throw new Error("offline") } } },
+  } as unknown as Plugin.Context
+  await expect(backfillLoadedSkills(context, "session-1", () => {})).rejects.toThrow("offline")
 })

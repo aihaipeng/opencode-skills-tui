@@ -108,9 +108,14 @@ export default Plugin.define({
 
     const [loadedBySession, setLoadedBySession] = createSignal(new Map<string, Set<string>>())
     const backfilled = new Set<string>()
-    const backfilling = new Set<string>()
+    const backfilling = new Map<string, AbortController>()
+    const deletedSessions = new Set<string>()
+    let disposed = false
+    let refreshID = 0
+    let initialRefreshTimer: ReturnType<typeof setTimeout> | undefined
 
     const markLoaded = (sessionID: string, skillName: string) => {
+      if (disposed || deletedSessions.has(sessionID)) return
       setLoadedBySession((current) => {
         const loaded = current.get(sessionID)
         if (loaded?.has(skillName)) return current
@@ -122,15 +127,23 @@ export default Plugin.define({
     }
 
     const ensureBackfill = (sessionID: string) => {
-      if (backfilled.has(sessionID) || backfilling.has(sessionID)) return
+      if (
+        disposed || deletedSessions.has(sessionID) ||
+        backfilled.has(sessionID) || backfilling.has(sessionID)
+      ) return
 
-      backfilling.add(sessionID)
-      void backfillLoadedSkills(ctx, sessionID, (skillName) => markLoaded(sessionID, skillName))
-        .then(() => backfilled.add(sessionID))
+      const controller = new AbortController()
+      backfilling.set(sessionID, controller)
+      void backfillLoadedSkills(ctx, sessionID, (skillName) => markLoaded(sessionID, skillName), controller.signal)
+        .then(() => {
+          if (!disposed && !controller.signal.aborted) backfilled.add(sessionID)
+        })
         .catch(() => {
           // History unreachable: live message scans still mark loads.
         })
-        .finally(() => backfilling.delete(sessionID))
+        .finally(() => {
+          if (backfilling.get(sessionID) === controller) backfilling.delete(sessionID)
+        })
     }
 
     const toggleCollapsed = () => {
@@ -158,24 +171,34 @@ export default Plugin.define({
       ctx.ui.dialog.set({ size: "xlarge", centered: true })
     }
 
-    const refreshSkills = async () => {
+    const refreshSkills = async (): Promise<boolean> => {
+      if (disposed) return true
+      const requestID = ++refreshID
       try {
-        setSkills(await loadAvailableSkills(ctx))
+        const available = await loadAvailableSkills(ctx)
+        if (disposed || requestID !== refreshID) return true
+        setSkills(available)
+        return available.length > 0
       } catch (error) {
+        if (disposed || requestID !== refreshID) return true
         ctx.ui.toast.show({
           variant: "error",
           title: "Skills",
           message: `Failed to load skills: ${error instanceof Error ? error.message : String(error)}`,
           duration: 5000,
         })
+        return false
       }
     }
 
-    void refreshSkills()
-
-    // OpenCode may initialize TUI plugins before location data is ready.
-    // One delayed retry keeps skill discovery from getting stuck empty.
-    const initialRefreshTimer = setTimeout(() => void refreshSkills(), 250)
+    // Retry only an empty/failed initial discovery. Do not race a slow first
+    // request or repeat a successful refresh triggered by a host event.
+    void refreshSkills().then((ready) => {
+      if (ready || disposed || refreshID !== 1) return
+      initialRefreshTimer = setTimeout(() => {
+        if (refreshID === 1) void refreshSkills()
+      }, 250)
+    })
 
     const unregisterSkillUpdated = ctx.data.on("skill.updated", () => {
       void refreshSkills()
@@ -190,6 +213,9 @@ export default Plugin.define({
     // message data.
     const unregisterSessionDeleted = ctx.data.on("session.deleted", (event) => {
       const sessionID = event.data.sessionID
+      deletedSessions.add(sessionID)
+      backfilling.get(sessionID)?.abort()
+      backfilling.delete(sessionID)
       setLoadedBySession((current) => {
         if (!current.has(sessionID)) return current
         const next = new Map(current)
@@ -227,7 +253,10 @@ export default Plugin.define({
     })
 
     return () => {
-      clearTimeout(initialRefreshTimer)
+      disposed = true
+      if (initialRefreshTimer !== undefined) clearTimeout(initialRefreshTimer)
+      for (const controller of backfilling.values()) controller.abort()
+      backfilling.clear()
 
       unregisterSlot()
       unregisterSkillUpdated()

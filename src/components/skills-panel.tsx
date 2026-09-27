@@ -31,7 +31,12 @@ export function SkillsPanel(props: SkillsPanelProps) {
 
   return (
     <box flexDirection="column">
-      <box flexDirection="row" columnGap={1} onMouseDown={props.onToggle}>
+      <box flexDirection="row" columnGap={1} onMouseDown={(event: MouseEvent) => {
+        if (event.button !== 0) return
+        event.preventDefault()
+        event.stopPropagation()
+        props.onToggle()
+      }}>
         <text style={{ fg: props.theme().text.base }}>
           <strong>{props.collapsed() ? "▶ Skills" : "▼ Skills"}</strong>
         </text>

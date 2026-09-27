@@ -70,11 +70,12 @@ export function extractMessageSkillLoads(message: unknown): string[] {
         state?: { status?: unknown; content?: unknown }
       }
       if (s.type !== "tool" || s.name !== "skill" || s.state?.status !== "completed") continue
-      const text = (Array.isArray(s.state.content) ? s.state.content : [])
-        .map((part) => (part as { text?: unknown })?.text)
-        .find((text): text is string => typeof text === "string")
-      const tagged = text?.match(SKILL_CONTENT_TAG)
-      if (tagged) names.push(tagged[1])
+      for (const part of Array.isArray(s.state.content) ? s.state.content : []) {
+        const text = (part as { text?: unknown })?.text
+        if (typeof text !== "string") continue
+        const tagged = text.match(SKILL_CONTENT_TAG)
+        if (tagged) names.push(tagged[1])
+      }
     }
     return names
   }
@@ -100,15 +101,19 @@ export async function backfillLoadedSkills(
   ctx: Context,
   sessionID: string,
   onLoad: (skillName: string) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   let cursor: string | undefined | null
   do {
+    if (signal?.aborted) return
     const page = await ctx.client.message.list({
       sessionID,
       limit: 200,
       ...(cursor ? { cursor } : {}),
     })
 
+    // The RPC need not support cancellation: discard late results and stop paging.
+    if (signal?.aborted) return
     for (const message of page.data) {
       for (const name of extractMessageSkillLoads(message)) {
         onLoad(name)
