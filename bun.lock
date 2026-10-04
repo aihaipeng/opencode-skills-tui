@@ -15,7 +15,6 @@
         "typescript": "^5.8.2",
       },
       "peerDependencies": {
-        "@opencode/theme": "2.0.16",
         "@opentui/core": ">=0.5.10",
         "@opentui/solid": ">=0.5.10",
         "solid-js": ">=1.9.0",

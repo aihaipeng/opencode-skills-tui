@@ -53,7 +53,10 @@ export function SkillsPanel(props: SkillsPanelProps) {
           <For each={visibleSkills()}>
             {(skill) => {
               const loaded = () => props.loadedNames().has(skill.name)
-              const onRowMouseDown = (event: MouseEvent) => {
+              // Open on mouseUp, not mouseDown: the host dialog's full-screen
+              // backdrop closes the dialog on any mouseup it receives, so a
+              // dialog opened during mousedown is dismissed by the release.
+              const onRowMouseUp = (event: MouseEvent) => {
                 if (event.button !== 0) return
                 event.preventDefault()
                 event.stopPropagation()
@@ -61,7 +64,7 @@ export function SkillsPanel(props: SkillsPanelProps) {
               }
 
               return (
-                <box width="100%" flexDirection="row" columnGap={1} onMouseDown={onRowMouseDown}>
+                <box width="100%" flexDirection="row" columnGap={1} onMouseUp={onRowMouseUp}>
                   <text
                     style={{
                       fg: loaded() ? props.theme().text.feedback.success.base : props.theme().text.muted,

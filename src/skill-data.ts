@@ -14,23 +14,19 @@ export async function loadAvailableSkills(ctx: Context): Promise<SkillSummary[]>
   return toSummaries(ctx.data.location.skill.list(location) ?? [])
 }
 
-/** Dedupe the server's skill list by display name and sort it. */
+/** Dedupe the server's skill list by display name (first entry wins) and sort it. */
 export function toSummaries(
   skills: readonly { name: string; description?: string; path?: string; content?: string }[],
 ): SkillSummary[] {
   const deduped = new Map<string, SkillSummary>()
-
   for (const entry of skills) {
-    if (!deduped.has(entry.name)) {
-      deduped.set(entry.name, {
-        name: entry.name,
-        description: entry.description,
-        path: entry.path,
-        content: entry.content ?? "",
-      })
-    }
+    deduped.set(entry.name, deduped.get(entry.name) ?? {
+      name: entry.name,
+      description: entry.description,
+      path: entry.path,
+      content: entry.content ?? "",
+    })
   }
-
   return [...deduped.values()].sort((a, b) => a.name.localeCompare(b.name))
 }
 

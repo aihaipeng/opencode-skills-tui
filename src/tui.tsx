@@ -3,12 +3,13 @@
 import { readFileSync } from "node:fs"
 import { Plugin } from "@opencode/plugin/tui"
 import { CodeRenderable, SyntaxStyle, isRenderable } from "@opentui/core"
-import type { Renderable } from "@opentui/core"
+import type { MouseEvent, Renderable } from "@opentui/core"
 import { createSignal, onCleanup } from "solid-js"
 import type { Accessor } from "solid-js"
 import { useTerminalDimensions } from "@opentui/solid"
 import type { ResolvedTheme } from "@opencode/theme/tui"
 import { SkillsPanel } from "./components/skills-panel"
+import { openUrl, resolveLinkToOpen } from "./open-link"
 import {
   backfillLoadedSkills,
   extractMessageSkillLoads,
@@ -53,10 +54,29 @@ function SkillPreviewDialog(props: {
   skill: SkillSummary
   raw?: string
   theme: Accessor<ResolvedTheme>
+  renderer: {
+    getLinkAt: (x: number, y: number) => string | null
+    getSelection: () => unknown
+  }
 }) {
   const dims = useTerminalDimensions()
   const syntaxStyle = createMarkdownSyntax(props.theme())
   onCleanup(() => syntaxStyle.destroy())
+
+  // ctrl+click opens links in the browser directly: OSC 8 emission is gated
+  // by terminal capability detection and highlight success inside opentui's
+  // native renderer, so terminal-native ctrl+click is not reliable. The
+  // renderer's screen-coordinate hit test works regardless.
+  const onPreviewMouseUp = (event: MouseEvent) => {
+    const url = resolveLinkToOpen(
+      event,
+      () => props.renderer.getSelection() !== null,
+      props.renderer.getLinkAt,
+    )
+    if (url === null) return
+    event.stopPropagation()
+    openUrl(url)
+  }
 
   let content: string
   if (props.raw) {
@@ -89,6 +109,7 @@ function SkillPreviewDialog(props: {
           content={content}
           syntaxStyle={syntaxStyle}
           tableOptions={{ wrapMode: "char" }}
+          onMouseUp={onPreviewMouseUp}
         />
       </scrollbox>
     </box>
@@ -164,9 +185,14 @@ export default Plugin.define({
           // Unreadable (missing, permissions, remote skill): fall back below.
         }
       }
+      // The host backdrop swallows the first dismiss click while a selection
+      // exists (mousedown sets dismiss=!!getSelection()), so a zero-width
+      // selection left over from the opening click would force users to
+      // click outside twice. Clear it before the dialog mounts.
+      ctx.renderer.clearSelection()
       // dialog.set() targets the active dialog, so show it first.
       ctx.ui.dialog.show(() => (
-        <SkillPreviewDialog skill={skill} raw={raw} theme={() => ctx.theme} />
+        <SkillPreviewDialog skill={skill} raw={raw} theme={() => ctx.theme} renderer={ctx.renderer} />
       ))
       ctx.ui.dialog.set({ size: "xlarge", centered: true })
     }

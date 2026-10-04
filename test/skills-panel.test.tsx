@@ -22,12 +22,14 @@ const makeContext = (overrides: {
   skillSync?: (location: any) => Promise<void>
   messageList?: (input: any) => Promise<any>
   toastShow?: (options: any) => void
+  clearSelection?: () => void
   on?: (name: string, callback: (event: any) => void) => () => void
   slot?: (options: { render: (input: { sessionID: string }) => any }) => () => void
   dialogShow?: () => void
   onDialogShow?: (render: () => any) => void
 } = {}) => ({
   location: { directory: process.cwd() },
+  renderer: { clearSelection: overrides.clearSelection ?? (() => {}) },
   storage: {
     memory: (_key: string, options: { initial: object }) => {
       const [state, setState] = createStore(options.initial)
@@ -89,6 +91,7 @@ test("sidebar clicks update the installed plugin", async () => {
   let render!: (input: { sessionID: string }) => any
   let unregistered = false
   let dialogShown = 0
+  let clearSelectionCalls = 0
   const events = new Map<string, (event: any) => void>()
   // Reactive stand-in for the host's message store: the plugin rescans it
   // whenever the slot claim re-renders.
@@ -125,6 +128,7 @@ test("sidebar clicks update the installed plugin", async () => {
       return () => { unregistered = true }
     },
     dialogShow: () => { dialogShown++ },
+    clearSelection: () => { clearSelectionCalls++ },
   })
   const cleanup = plugin.setup!(context) as () => void
   const view = await testRender(() => (
@@ -160,6 +164,9 @@ test("sidebar clicks update the installed plugin", async () => {
     await view.waitForFrame((frame) => frame.includes("▼ Skills"))
     await view.mockMouse.click(4, 1)
     expect(dialogShown).toBe(1)
+    // Opening the preview clears any leftover selection: the host backdrop
+    // otherwise swallows the first click-outside dismiss.
+    expect(clearSelectionCalls).toBe(1)
   } finally {
     cleanup()
     view.renderer.destroy()

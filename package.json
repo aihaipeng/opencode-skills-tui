@@ -1,6 +1,6 @@
 {
   "name": "opencode-skills-tui",
-  "version": "1.0.4",
+  "version": "1.1.0",
   "description": "OpenCode TUI plugin that shows skills and loaded state in the sidebar",
   "type": "module",
   "license": "MIT",
@@ -43,7 +43,6 @@
     "@opencode/plugin": "^2.0.16"
   },
   "peerDependencies": {
-    "@opencode/theme": "2.0.16",
     "@opentui/core": ">=0.5.10",
     "@opentui/solid": ">=0.5.10",
     "solid-js": ">=1.9.0"
