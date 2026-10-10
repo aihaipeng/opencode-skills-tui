@@ -10,3 +10,21 @@ DECISIONS.md
 HANDOFF.md
 node_modules/
 dist/
+
+# Local configuration, secrets and generated files
+/.opencode/
+.env
+.env.*
+/.cache/
+/coverage/
+*.tsbuildinfo
+*.tmp
+*.bak
+*~
+
+# Internal research and design notes (kept locally)
+/docs/SKILL-CALL-STATS-DESIGN.md
+/docs/SKILL-CAPABILITIES.md
+/docs/SKILL-MANAGEMENT-RESEARCH.md
+/docs/SKILL-SOURCES.md
+/docs/SKILL-TOKEN-RESEARCH.md

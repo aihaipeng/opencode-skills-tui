@@ -1,89 +1,131 @@
 /** @jsxImportSource @opentui/solid */
 
-import { For, Show, createMemo } from "solid-js"
+import { For, Show, createMemo, createSignal } from "solid-js"
 import type { Accessor } from "solid-js"
 import type { MouseEvent } from "@opentui/core"
 import type { ResolvedTheme } from "@opencode/theme/tui"
-import type { SkillSummary } from "../skill-data"
-import { sortSkillsByLoaded } from "../skill-data"
+import type { SkillDisplayMode, SkillSummary, SkillTokenMode } from "../skill-data"
+import { estimateSkillTokens, estimateSkillListingTotal, formatTokenCount, sortSkillsByLoaded } from "../skill-data"
 
 export interface SkillsPanelProps {
   skills: Accessor<SkillSummary[]>
-  loadedNames: Accessor<Set<string>>
+  /** Catalog counts exclude extra rows retained only by successful loading. */
+  modelVisibleCount: Accessor<number>
+  registeredCount: Accessor<number>
+  scope: Accessor<SkillDisplayMode>
+  showState: Accessor<boolean>
+  tokenMode: Accessor<SkillTokenMode>
+  /** All IDs loaded in the current stage, including skills hidden from the model listing. */
+  loadedIDs: Accessor<Set<string>>
+  emptyMessage: Accessor<string>
   theme: Accessor<ResolvedTheme>
   collapsed: Accessor<boolean>
   onToggle: () => void
-  onSkillPreview: (skill: SkillSummary) => void
+  onSkillClick: (skill: SkillSummary, button: 0 | 1 | 2) => void
 }
 
 export function SkillsPanel(props: SkillsPanelProps) {
-  const visibleSkills = createMemo(() => {
-    const loaded = props.loadedNames()
+  // Match the Themes picker selection, including dialog-specific overrides.
+  const loadedColor = () => props.theme().surface("dialog").background.action.primary.focused
+  const displayedSkills = createMemo(() => {
+    const loaded = props.loadedIDs()
     return sortSkillsByLoaded(props.skills(), loaded)
   })
-
-  const headerSummary = createMemo(() => {
-    const loaded = props.loadedNames()
-    const loadedCount = visibleSkills().filter((skill) => loaded.has(skill.name)).length
-    const total = props.skills().length
-    return `(${loadedCount} loaded ${total} available)`
+  const loadedCount = createMemo(() => displayedSkills().filter((skill) => props.loadedIDs().has(skill.id)).length)
+  const [stateWidth, setStateWidth] = createSignal(0)
+  const totalCount = () => props.scope() === "registered" ? props.registeredCount() : props.modelVisibleCount()
+  const fullState = () => props.scope() === "loaded" ? `(${loadedCount()} loaded)`
+    : `(${loadedCount()} loaded · ${totalCount()} ${props.scope() === "registered" ? "registered" : "visible"})`
+  const state = () => fullState().length <= stateWidth() ? fullState()
+    : props.scope() === "loaded" ? `(${loadedCount()})` : `(${loadedCount()}/${totalCount()})`
+  const estimates = createMemo(() => {
+    const mode = props.tokenMode()
+    return new Map(mode === "off" ? [] : displayedSkills().map((skill) => [skill.id, estimateSkillTokens(skill, mode)]))
   })
+  const tokenLabel = (tokens: number | undefined) => tokens === undefined ? "-" : `~${formatTokenCount(tokens)} tok`
+  // The total prices only what the model can auto-load; hidden skills keep row estimates.
+  const totalTokens = createMemo(() => {
+    const visible = displayedSkills().filter((skill) => skill.modelVisible)
+    const mode = props.tokenMode()
+    // No public API exposes the active skill tool definition; this total excludes that shared schema.
+    if (mode === "listing") return tokenLabel(estimateSkillListingTotal(visible))
+    const counts = visible.map((skill) => mode === "loaded-total" ? estimateSkillTokens(skill, "load-delta") : estimates().get(skill.id))
+    if (counts.some((count) => count === undefined)) return tokenLabel(undefined)
+    const load = counts.reduce<number>((sum, count) => sum + count!, 0)
+    const listing = mode === "loaded-total" ? estimateSkillListingTotal(visible) : 0
+    return tokenLabel(listing === undefined ? undefined : listing + load)
+  })
+  const tokenWidth = createMemo(() => Math.max(totalTokens().length, ...[...estimates().values()].map((count) => tokenLabel(count).length)))
 
   return (
-    <box flexDirection="column">
-      <box flexDirection="row" columnGap={1} onMouseDown={(event: MouseEvent) => {
-        if (event.button !== 0) return
+    <box flexDirection="column" paddingRight={1}>
+      <box id="skills-panel.header" width="100%" flexDirection="row" gap={1} onMouseUp={(event: MouseEvent) => {
+        if (event.button !== 0 && event.button !== 2) return
         event.preventDefault()
         event.stopPropagation()
         props.onToggle()
       }}>
-        <text style={{ fg: props.theme().text.base }}>
-          <strong>{props.collapsed() ? "▶ Skills" : "▼ Skills"}</strong>
+        {/* Compact the counts before truncating; keep the title and token column visible. */}
+        <text flexShrink={0} fg="#ffffff">
+          {props.collapsed() ? "▶" : "▼"}
         </text>
-        <Show when={props.collapsed()}>
-          <text style={{ fg: props.theme().text.muted }}>{headerSummary()}</text>
+        <text flexShrink={0} fg="#ffffff"><b>Skills</b></text>
+        <Show when={props.showState()} fallback={<box flexGrow={1} />}>
+          {/* TextBufferRenderable skips onSizeChange; measure its allocated box. */}
+          <box onSizeChange={function () { setStateWidth(this.width) }} flexGrow={1} minWidth={0} height={1} flexShrink={1}>
+            {/* content updates before painting; JSX text nodes wait another frame. */}
+            <text content={state()} width="100%" height={1} wrapMode="none" truncate fg={props.theme().text.muted} />
+          </box>
+        </Show>
+        <Show when={props.tokenMode() !== "off"}>
+          <text id="skills-panel.total-tokens" width={tokenWidth()} height={1} flexShrink={0} textAlign="right" fg={props.theme().text.muted}>{totalTokens()}</text>
         </Show>
       </box>
 
       <Show when={!props.collapsed()}>
         <Show
-          when={visibleSkills().length > 0}
-          fallback={<text style={{ fg: props.theme().text.muted }}>No skills available</text>}
+          when={displayedSkills().length > 0}
+          fallback={<text width="100%" flexShrink={0} wrapMode="char" fg={props.theme().text.muted}>{props.emptyMessage()}</text>}
         >
-          <For each={visibleSkills()}>
+          <For each={displayedSkills()}>
             {(skill) => {
-              const loaded = () => props.loadedNames().has(skill.name)
+              const loaded = () => props.loadedIDs().has(skill.id)
+              const color = () => loaded() ? loadedColor() : skill.modelVisible === false ? props.theme().text.muted : "#ffffff"
               // Open on mouseUp, not mouseDown: the host dialog's full-screen
               // backdrop closes the dialog on any mouseup it receives, so a
               // dialog opened during mousedown is dismissed by the release.
               const onRowMouseUp = (event: MouseEvent) => {
-                if (event.button !== 0) return
+                if (event.button !== 0 && event.button !== 1 && event.button !== 2) return
                 event.preventDefault()
                 event.stopPropagation()
-                props.onSkillPreview(skill)
+                props.onSkillClick(skill, event.button)
               }
 
               return (
-                <box width="100%" flexDirection="row" columnGap={1} onMouseUp={onRowMouseUp}>
+                <box id={`skills-panel.${skill.id}`} width="100%" flexDirection="row" columnGap={1} onMouseUp={onRowMouseUp}>
                   <text
-                    style={{
-                      fg: loaded() ? props.theme().text.feedback.success.base : props.theme().text.muted,
-                    }}
+                    flexShrink={0}
+                    fg={color()}
                   >
                     {"•"}
                   </text>
+                  {/* Numeric height resets flexShrink; restore it afterwards. */}
                   <text
                     flexGrow={1}
                     minWidth={0}
                     height={1}
+                    flexShrink={1}
                     wrapMode="none"
                     truncate
-                    style={{
-                      fg: loaded() ? props.theme().text.feedback.success.base : props.theme().text.base,
-                    }}
+                    fg={color()}
                   >
-                    {skill.name}
+                    {skill.name ?? skill.id}
                   </text>
+                  <Show when={props.tokenMode() !== "off"}>
+                    <text id={`skills-panel.${skill.id}.tokens`} width={tokenWidth()} height={1} flexShrink={0} textAlign="right" fg={props.theme().text.muted}>
+                      {tokenLabel(estimates().get(skill.id))}
+                    </text>
+                  </Show>
                 </box>
               )
             }}

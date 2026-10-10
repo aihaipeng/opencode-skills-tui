@@ -10,48 +10,68 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
 </p>
 
-A skill list for your [**OpenCode**](https://opencode.ai) sidebar. See what's available, check what the current session has loaded, and read SKILL.md without leaving the terminal.
+Browse skills, track loaded state, preview SKILL.md, and insert skill attachments from the [OpenCode](https://opencode.ai) terminal sidebar.
 
 ![Skills panel demo](assets/demo.gif)
 
-## ✨ What you get
+## Install / update / remove
 
-- Browse the skills available to your project, with loaded skills pinned in green and tracked per session.
-- Click a skill to read its SKILL.md in a scrollable preview.
-
-## 📦 Install
-
-Requires OpenCode ≥ 2.0:
+Requires **OpenCode ≥ 2.0**. Terminal UI (TUI) only.
 
 ```bash
-# install
-opencode plugin add opencode-skills-tui
-# uninstall
-opencode plugin remove opencode-skills-tui
-# update
-opencode plugin update opencode-skills-tui
+# Install / update / remove
+opencode plugin add/update/remove opencode-skills-tui
 ```
+
+Replace `add/update/remove` with the desired subcommand before running.
 
 On V1, see the [V1 guide](https://github.com/aihaipeng/opencode-skills-tui/blob/v0.4.4/README.md).
 
-## 🔧 A few tips
+## Parameters
 
-- **Where the green marks come from**: derived from session messages (skill tool calls and @-mentions). Reopening an old session restores them after a moment; opening a preview never loads a skill.
-- **Updating**: run `opencode plugin update opencode-skills-tui`, then restart. npm copies are cached under `~/.cache/opencode/npm/opencode-skills-tui@latest/`; delete that directory if an update refuses to land.
+Left- or right-click the **Skills** header to expand or collapse the list. Open settings with `/skills-sidebar` or select **Skills Sidebar** in the command palette.
 
-## 🛠️ Development
+| Setting | Description | Available values |
+| --- | --- | --- |
+| Show sidebar | Show or hide the panel | `on` / `off` |
+| Display scope | Choose which skills to show (see below) | `model-visible` / `registered` / `loaded-only` |
+| Token estimation | Show static token estimates | `list entry` / `load cost` / `total cost` / `off` |
+| Header counts | Show skill counts in the header | `on` / `off` |
+| Skill overview | Choose the mouse button for a read-only preview | `left-click` / `middle-click` / `right-click` / `off` |
+| Insert @mention | Choose the mouse button for inserting a native skill attachment into the prompt | `left-click` / `middle-click` / `right-click` / `off` |
 
-Working on the plugin? Clone the repo and install [Bun](https://bun.sh) for the development tools:
+- **Display scope:**
+  - `model-visible`: skills the model can discover and invoke automatically.
+  - `loaded-only`: only skills successfully loaded in the current stage, including hidden skills.
+  - `registered`: all skills registered for the host's current directory, including hidden skills.
+
+  **Hidden skills:** omitted from the model's available list by metadata or permission rules, **not offered for automatic discovery/invocation**, but can be explicitly loaded with `@skill-id`. Hidden does not mean loading is disabled.
+
+  Every scope retains current-stage loaded IDs. Loaded skills are highlighted and pinned to the top; unloaded hidden skills stay muted. Automatic invocation still follows the host's permission rules. Display scope does not change permissions, and hiding the panel does not disable skills.
+- **Token estimation:**
+  - `list entry`: estimated tokens for a model-visible listing entry (ID, name, description), without the skill body; hidden entries cost `0`.
+  - `load cost`: estimated additional tokens for one ordinary load, including the body and host-added information.
+  - `total cost`: per-skill `list entry + load cost`, regardless of whether the skill is currently loaded.
+
+  These are static estimates, not live context usage, cumulative consumption or billing; unavailable values show `-`.
+
+Settings persist across sessions and restarts and sync across local TUI instances; collapse stays per-terminal.
+
+## Notes
+
+- **Unloaded after compaction:** OpenCode's context compaction (`/compact`) is [lossy](https://opencode.ai/v2/docs/compaction/) and does not guarantee continued adherence to skill instructions. Successful compaction resets load marks; a new successful load highlights the skill again. `loaded` counts distinct successfully loaded skills since session start or the latest successful compaction, not invocations. Unloaded does not mean all skill text is absent from context.
+- **Preview:** locally readable SKILL.md takes priority; otherwise the host's registered body is shown. Preview text may differ from model input. Ctrl+click rendered HTTP(S) links to open them in your browser.
+
+## Local development
+
+In a local checkout, use [Bun](https://bun.sh):
 
 ```bash
-git clone https://github.com/aihaipeng/opencode-skills-tui.git
-cd opencode-skills-tui
 bun install
-bun run typecheck
+bun run build
 bun run test
-bun run test:package
 ```
 
-Run `bun run build` before loading this repository as a local plugin, then add its `file://` path to the `plugins` array in `cli.json` and restart. Published npm packages ship precompiled Solid code and need no build step.
+Replace the npm entry with the checkout's absolute `file://` URL in the existing `plugins` array in `opencode.json(c)`. Rebuild and restart the TUI after code changes.
 
-[Plugin installation](https://opencode.ai/v2/docs/cli/plugins) · [V2 plugin API](https://opencode.ai/v2/docs/build/plugins/cli) · [MIT license](LICENSE)
+[OpenCode plugin docs](https://opencode.ai/v2/docs/plugins) · [MIT license](LICENSE)
