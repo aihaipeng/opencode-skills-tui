@@ -14,7 +14,7 @@
 
 ![技能面板演示](assets/demo.gif)
 
-## 安装／更新／卸载
+## 📦 安装／更新／卸载
 
 要求 **OpenCode ≥ 2.0**，仅适用于终端界面（TUI）。
 
@@ -27,9 +27,9 @@ opencode plugin add/update/remove opencode-skills-tui
 
 V1 用户请参考 [V1 说明](https://github.com/aihaipeng/opencode-skills-tui/blob/v0.4.4/README.zh-CN.md)。
 
-## 参数说明
+## ⚙️ 参数说明
 
-左键或右键点击 **Skills** 标题展开／折叠列表；运行 `/skills-sidebar` 或在命令面板中选择 **Skills Sidebar** 打开设置。
+运行 `/skills-sidebar` 打开设置面板。
 
 | 设置 | 简要说明 | 可选参数 |
 | --- | --- | --- |
@@ -57,12 +57,31 @@ V1 用户请参考 [V1 说明](https://github.com/aihaipeng/opencode-skills-tui/
 
 设置跨会话和重启保留，并在本地 TUI 实例间同步；折叠状态仅属于当前终端。
 
-## 注意事项
+## 💡 注意事项
 
 - **压缩后显示未加载**：OpenCode 的上下文压缩（`/compact`，Compaction）是[有损压缩](https://opencode.ai/v2/docs/compaction/)，不保证模型在压缩后持续遵循技能。因此插件在压缩成功后重置加载标记，重新成功加载才再次高亮。`loaded` 统计会话开始或最近一次成功压缩后加载成功的不同技能数，不是调用次数；未加载不代表上下文中已没有技能文本。
 - **预览**：优先读取本地可读的 SKILL.md，否则展示宿主注册正文；内容可能不同于模型输入。Ctrl+点击已渲染的 HTTP(S) 链接可在浏览器中打开。
 
-## 本地开发
+## 📁 源码结构
+
+```text
+opencode-skills-tui/
+├── src/
+│   ├── tui.tsx                 # 插件注册、预览及原生技能附件
+│   ├── skill-data.ts           # 技能可见性、加载状态及 token 估值
+│   ├── open-link.ts            # Ctrl+点击打开链接
+│   └── components/
+│       ├── skills-panel.tsx    # 侧栏面板
+│       └── skills-dialog.tsx   # 侧栏设置弹窗
+├── scripts/                    # 构建及打包校验
+├── test/                       # 回归测试
+├── assets/                     # 演示素材
+├── dist/                       # 生成的 TUI 构建产物
+├── index.ts                    # 宿主要求的空操作 server 入口
+└── tui.tsx                     # 转出预编译 TUI 的包入口
+```
+
+## 🛠️ 本地开发
 
 在本地仓库中使用 [Bun](https://bun.sh)：
 

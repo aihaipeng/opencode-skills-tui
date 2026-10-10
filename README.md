@@ -14,7 +14,7 @@ Browse skills, track loaded state, preview SKILL.md, and insert skill attachment
 
 ![Skills panel demo](assets/demo.gif)
 
-## Install / update / remove
+## 📦 Install / update / remove
 
 Requires **OpenCode ≥ 2.0**. Terminal UI (TUI) only.
 
@@ -27,9 +27,9 @@ Replace `add/update/remove` with the desired subcommand before running.
 
 On V1, see the [V1 guide](https://github.com/aihaipeng/opencode-skills-tui/blob/v0.4.4/README.md).
 
-## Parameters
+## ⚙️ Parameters
 
-Left- or right-click the **Skills** header to expand or collapse the list. Open settings with `/skills-sidebar` or select **Skills Sidebar** in the command palette.
+Run `/skills-sidebar` to open the settings panel.
 
 | Setting | Description | Available values |
 | --- | --- | --- |
@@ -57,12 +57,31 @@ Left- or right-click the **Skills** header to expand or collapse the list. Open 
 
 Settings persist across sessions and restarts and sync across local TUI instances; collapse stays per-terminal.
 
-## Notes
+## 💡 Notes
 
 - **Unloaded after compaction:** OpenCode's context compaction (`/compact`) is [lossy](https://opencode.ai/v2/docs/compaction/) and does not guarantee continued adherence to skill instructions. Successful compaction resets load marks; a new successful load highlights the skill again. `loaded` counts distinct successfully loaded skills since session start or the latest successful compaction, not invocations. Unloaded does not mean all skill text is absent from context.
 - **Preview:** locally readable SKILL.md takes priority; otherwise the host's registered body is shown. Preview text may differ from model input. Ctrl+click rendered HTTP(S) links to open them in your browser.
 
-## Local development
+## 📁 Source structure
+
+```text
+opencode-skills-tui/
+├── src/
+│   ├── tui.tsx                 # Plugin setup, preview, and native skill attachments
+│   ├── skill-data.ts           # Skill visibility, load state, and token estimates
+│   ├── open-link.ts            # Ctrl+click link opening
+│   └── components/
+│       ├── skills-panel.tsx    # Sidebar panel
+│       └── skills-dialog.tsx   # Sidebar settings dialog
+├── scripts/                    # Build and package validation
+├── test/                       # Regression tests
+├── assets/                     # Demo media
+├── dist/                       # Generated TUI bundle
+├── index.ts                    # Required no-op server entry
+└── tui.tsx                     # Forwards to the compiled TUI bundle
+```
+
+## 🛠️ Local development
 
 In a local checkout, use [Bun](https://bun.sh):
 
