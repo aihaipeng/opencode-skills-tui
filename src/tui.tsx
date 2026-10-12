@@ -1,13 +1,12 @@
 /** @jsxImportSource @opentui/solid */
 
 import { readFileSync } from "node:fs"
-import { Plugin } from "@opencode/plugin/tui"
+import type { Plugin } from "@opencode/plugin/tui"
 import { CliRenderEvents, CodeRenderable, InputRenderable, SyntaxStyle, TextAttributes, isRenderable } from "@opentui/core"
 import type { MouseEvent, Renderable } from "@opentui/core"
 import { Show, createEffect, createMemo, createSignal, onCleanup } from "solid-js"
 import type { Accessor } from "solid-js"
 import type { LocationRef } from "@opencode/client"
-import { locationKey } from "@opencode/client/solid"
 import { useTerminalDimensions } from "@opentui/solid"
 import type { ResolvedTheme } from "@opencode/theme/tui"
 import { SkillsPanel } from "./components/skills-panel"
@@ -27,6 +26,14 @@ import {
 } from "./skill-data"
 
 const EMPTY_LOADED_SKILLS = new Set<string>()
+
+// shortcut: runtime imports of @opencode/plugin/tui or @opencode/client/solid load
+// @opencode/schema against the host binary's embedded effect, which broke on the
+// effect 4.0.1 isStartsWith → isStartingWith rename (host 2.0.27); keep both local.
+const definePlugin = (plugin: Plugin.Definition): Plugin.Definition => plugin
+
+// Same composite key as @opencode/client/solid locationKey.
+const locationKey = (location: LocationRef) => JSON.stringify([location.directory, location.workspaceID])
 
 function createMarkdownSyntax(theme: ResolvedTheme) {
   const markdown = theme.markdown
@@ -161,7 +168,7 @@ function SkillPreviewDialog(props: {
   )
 }
 
-export default Plugin.define({
+export default definePlugin({
   id: "opencode-skills-tui",
   setup(ctx) {
     // Keep collapse per-terminal. Old in-memory settings seed the durable store on reload.
