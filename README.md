@@ -19,11 +19,11 @@ Browse skills, track loaded state, preview SKILL.md, and insert skill attachment
 Requires **OpenCode ≥ 2.0**. Terminal UI (TUI) only.
 
 ```bash
-# Install / update / remove
-opencode plugin add/update/remove opencode-skills-tui
+opencode plugin add opencode-skills-tui
 ```
 
-Replace `add/update/remove` with the desired subcommand before running.
+- Update: `opencode plugin update opencode-skills-tui`
+- Remove: `opencode plugin remove opencode-skills-tui`
 
 On V1, see the [V1 guide](https://github.com/aihaipeng/opencode-skills-tui/blob/v0.4.4/README.md).
 
