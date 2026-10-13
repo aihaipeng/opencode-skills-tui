@@ -2,7 +2,7 @@
 
 import { For, Show, createMemo, createSignal } from "solid-js"
 import type { Accessor } from "solid-js"
-import type { MouseEvent } from "@opentui/core"
+import type { MouseEvent, ThemeMode } from "@opentui/core"
 import type { ResolvedTheme } from "@opencode/theme/tui"
 import type { SkillDisplayMode, SkillSummary, SkillTokenMode } from "../skill-data"
 import { estimateSkillTokens, estimateSkillListingTotal, formatTokenCount, sortSkillsByLoaded } from "../skill-data"
@@ -19,6 +19,7 @@ export interface SkillsPanelProps {
   loadedIDs: Accessor<Set<string>>
   emptyMessage: Accessor<string>
   theme: Accessor<ResolvedTheme>
+  themeMode: Accessor<ThemeMode>
   collapsed: Accessor<boolean>
   onToggle: () => void
   onSkillClick: (skill: SkillSummary, button: 0 | 1 | 2) => void
@@ -27,6 +28,7 @@ export interface SkillsPanelProps {
 export function SkillsPanel(props: SkillsPanelProps) {
   // Match the Themes picker selection, including dialog-specific overrides.
   const loadedColor = () => props.theme().surface("dialog").background.action.primary.focused
+  const normalColor = () => props.themeMode() === "light" ? "#000000" : "#ffffff"
   const displayedSkills = createMemo(() => {
     const loaded = props.loadedIDs()
     return sortSkillsByLoaded(props.skills(), loaded)
@@ -66,10 +68,10 @@ export function SkillsPanel(props: SkillsPanelProps) {
         props.onToggle()
       }}>
         {/* Compact the counts before truncating; keep the title and token column visible. */}
-        <text flexShrink={0} fg="#ffffff">
+        <text flexShrink={0} fg={normalColor()}>
           {props.collapsed() ? "▶" : "▼"}
         </text>
-        <text flexShrink={0} fg="#ffffff"><b>Skills</b></text>
+        <text flexShrink={0} fg={normalColor()}><b>Skills</b></text>
         <Show when={props.showState()} fallback={<box flexGrow={1} />}>
           {/* TextBufferRenderable skips onSizeChange; measure its allocated box. */}
           <box onSizeChange={function () { setStateWidth(this.width) }} flexGrow={1} minWidth={0} height={1} flexShrink={1}>
@@ -90,7 +92,9 @@ export function SkillsPanel(props: SkillsPanelProps) {
           <For each={displayedSkills()}>
             {(skill) => {
               const loaded = () => props.loadedIDs().has(skill.id)
-              const color = () => loaded() ? loadedColor() : skill.modelVisible === false ? props.theme().text.muted : "#ffffff"
+              const color = () => loaded() ? loadedColor()
+                : skill.modelVisible === false ? props.theme().text.muted
+                : normalColor()
               // Open on mouseUp, not mouseDown: the host dialog's full-screen
               // backdrop closes the dialog on any mouseup it receives, so a
               // dialog opened during mousedown is dismissed by the release.

@@ -47,7 +47,17 @@ Run `/skills-sidebar` to open the settings panel.
 
   **Hidden skills:** omitted from the model's available list by metadata or permission rules, **not offered for automatic discovery/invocation**, but can be explicitly loaded with `@skill-id`. Hidden does not mean loading is disabled.
 
-  Every scope retains current-stage loaded IDs. Loaded skills are highlighted and pinned to the top; unloaded hidden skills stay muted. Automatic invocation still follows the host's permission rules. Display scope does not change permissions, and hiding the panel does not disable skills.
+  Every scope retains current-stage loaded IDs. Loaded skills, including hidden ones, are pinned to the top. Automatic invocation still follows the host's permission rules. Display scope does not change permissions, and hiding the panel does not disable skills.
+- **Sidebar colors:**
+
+  | Item | Color |
+  | --- | --- |
+  | Skills title and expand/collapse arrow | White in dark mode; black in light mode |
+  | Unloaded, model-visible skill names and bullets | White in dark mode; black in light mode |
+  | Loaded skill names and bullets, including hidden skills | Theme selection highlight |
+  | Unloaded hidden skills, header counts, and token estimates | Theme muted color |
+
+  Colors update when the active mode or theme changes. Unloaded model-visible skills do not use the theme's body text color, which can resemble the loaded highlight in themes such as `tokyonight light`.
 - **Token estimation:**
   - `list entry`: estimated tokens for a model-visible listing entry (ID, name, description), without the skill body; hidden entries cost `0`.
   - `load cost`: estimated additional tokens for one ordinary load, including the body and host-added information.
@@ -60,7 +70,7 @@ Settings persist across sessions and restarts and sync across local TUI instance
 ## 💡 Notes
 
 - **Unloaded after compaction:** OpenCode's context compaction (`/compact`) is [lossy](https://opencode.ai/v2/docs/compaction/) and does not guarantee continued adherence to skill instructions. Successful compaction resets load marks; a new successful load highlights the skill again. `loaded` counts distinct successfully loaded skills since session start or the latest successful compaction, not invocations. Unloaded does not mean all skill text is absent from context.
-- **Preview:** locally readable SKILL.md takes priority; otherwise the host's registered body is shown. Preview text may differ from model input. Ctrl+click rendered HTTP(S) links to open them in your browser.
+- **Preview:** locally readable SKILL.md takes priority; otherwise the host's registered body is shown. Preview text may differ from model input. Colors follow the active theme, including changes while the preview is open; Markdown styling, text selection, and copying are preserved. Ctrl+click rendered HTTP(S) links to open them in your browser.
 
 ## 📁 Source structure
 

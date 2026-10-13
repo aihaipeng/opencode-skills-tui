@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Show, createComponent, createRoot, createSignal, getOwner, onCleanup } from "solid-js"
 import { createData } from "@opencode/client/solid"
-import { CliRenderEvents, CodeRenderable, RGBA, TextAttributes } from "@opentui/core"
+import { CliRenderEvents, CodeRenderable, RGBA, Selection, TextAttributes, TextBufferRenderable, TextTableRenderable } from "@opentui/core"
 import { TestRecorder } from "@opentui/core/testing"
 import type { KeyEvent, Renderable, ScrollBoxRenderable, TextareaRenderable } from "@opentui/core"
 import { testRender, useRenderer } from "@opentui/solid"
@@ -69,6 +69,7 @@ const makeContext = (overrides: {
   }
   const context = {
     location: { directory: process.cwd() },
+    themeMode: "dark",
     renderer: { clearSelection: overrides.clearSelection ?? (() => {}) },
     storage: {
       store: (_key: string, options: { initial: object }) => {
@@ -503,6 +504,94 @@ test("preview dialog renders wrapped description and body without title or overl
     }
   }, { width: 110, height: 24 })
 })
+
+for (const initialMode of ["light", "dark"] as const) {
+  test(`sidebar and preview colors follow ${initialMode} mode, including native text selections and live theme changes`, async () => {
+    let dialogRender!: () => any
+    const [mode, setMode] = createSignal<"light" | "dark">(initialMode)
+    const palettes = {
+      light: { text: "#24292f", background: "#f6f8fa", muted: "#57606a", link: "#0969da", code: "#8250df" },
+      dark: { text: "#c9d1d9", background: "#161b22", muted: "#8b949e", link: "#58a6ff", code: "#d2a8ff" },
+    }
+    const palette = () => palettes[mode()]
+    const skill = {
+      id: "alpha", name: "alpha", description: "",
+      content: "Paragraph with `inline` and [link](https://example.com).\n\n# Heading\n\n> Quote\n\n- Item\n\n```text\nCode block\n```\n\n| Name | Value |\n| ---- | ----- |\n| Cell | `CellCode` |\n",
+    }
+    const context = makeContext({ skills: () => [skill], onDialogShow: (render) => { dialogRender = render } })
+    Object.defineProperty(context, "themeMode", { get: mode })
+    const theme = context.theme
+    Object.defineProperty(context, "theme", { get: () => ({
+      ...theme,
+      text: { ...theme.text, base: RGBA.fromHex(palette().text), muted: RGBA.fromHex(palette().muted) },
+      markdown: {
+        ...theme.markdown,
+        text: RGBA.fromHex(palette().text), heading: RGBA.fromHex(palette().text),
+        strong: RGBA.fromHex(palette().text), emphasis: RGBA.fromHex(palette().text),
+        listItem: RGBA.fromHex(palette().text), blockQuote: RGBA.fromHex(palette().text),
+        code: RGBA.fromHex(palette().code), link: RGBA.fromHex(palette().link), linkText: RGBA.fromHex(palette().link),
+      },
+      // The dialog surface differs from the base background on purpose.
+      surface: () => ({ ...theme, background: { ...theme.background, base: RGBA.fromHex(palette().background) } }),
+    }) })
+    await withPanel(context, async (view) => {
+      await view.waitForFrame((frame) => frame.includes("alpha"))
+      const sidebarSpans = view.captureSpans().lines.flatMap((line) => line.spans)
+      for (const text of ["Skills", "▼", "alpha", "•"]) {
+        expect(sidebarSpans.find((span) => span.text.includes(text))!.fg.equals(RGBA.fromHex(initialMode === "light" ? "#000000" : "#ffffff"))).toBe(true)
+      }
+      await view.mockMouse.click(4, 1)
+      const dialogView = await testRender(() => dialogRender(), { width: 110, height: 40 })
+      const nodes: (TextBufferRenderable | TextTableRenderable)[] = []
+      const visit = (node: Renderable) => {
+        if (node instanceof TextBufferRenderable || node instanceof TextTableRenderable) nodes.push(node)
+        for (const child of node.getChildren()) visit(child)
+      }
+      try {
+        for (const nextMode of [initialMode, initialMode === "light" ? "dark" : "light", initialMode] as const) {
+          setMode(nextMode)
+          // Markdown propagates styles on the next frame; existing highlighters must stay valid meanwhile.
+          for (const node of nodes) {
+            if (node instanceof CodeRenderable) expect(() => node.syntaxStyle.getStyle("default")).not.toThrow()
+          }
+          await waitForMarkdown(dialogView)
+          await dialogView.flush()
+          const samples = ["id: alpha", "stats:", "path:", "provided by plugin", "Paragraph", "inline", "link", "Heading", "Quote", "Item", "Code block", "Cell", "CellCode"]
+          const foreground = (text: string) => /id:|stats:|path:|provided by plugin/.test(text) ? palette().muted
+            : text === "inline" || text === "CellCode" ? palette().code : text === "link" ? palette().link : palette().text
+          const spans = () => dialogView.captureSpans().lines.flatMap((line) => line.spans)
+          for (const text of samples) {
+            const span = spans().find((span) => span.text.includes(text))!
+            expect({ text, mode: nextMode, fg: span.fg.toInts(), bg: span.bg.toInts() }).toEqual({
+              text, mode: nextMode, fg: RGBA.fromHex(foreground(text)).toInts(), bg: RGBA.fromHex(palette().background).toInts(),
+            })
+          }
+          nodes.length = 0
+          visit(dialogView.renderer.root)
+          const first = nodes[0]
+          const last = nodes.at(-1)!
+          // Exercise native selection painting directly; mouse selection is disabled in testRender.
+          const selection = new Selection(first, { x: first.x, y: first.y }, { x: last.x + last.width - 1, y: last.y + last.height - 1 })
+          const frame = dialogView.captureCharFrame()
+          for (const node of nodes) node.onSelectionChanged(selection)
+          await dialogView.flush()
+          expect(dialogView.captureCharFrame()).toBe(frame)
+          for (const text of samples) {
+            const span = spans().find((span) => span.text.includes(text))!
+            expect({ text, mode: nextMode, fg: span.fg.toInts(), bg: span.bg.toInts() }).toEqual({
+              text, mode: nextMode, fg: RGBA.fromHex(palette().background).toInts(), bg: RGBA.fromHex(foreground(text)).toInts(),
+            })
+          }
+          const copied = nodes.map((node) => node.getSelectedText()).join("\n")
+          for (const text of samples) expect(copied).toContain(text)
+          for (const node of nodes) node.onSelectionChanged(null)
+        }
+      } finally {
+        dialogView.renderer.destroy()
+      }
+    }, { width: 110, height: 40 })
+  })
+}
 
 test("overview plugin data is italic and separated from the raw SKILL.md without title or frontmatter rules", async () => {
   const dir = mkdtempSync(join(tmpdir(), "skills-tui-test-"))
@@ -1654,6 +1743,44 @@ test("agent changes and session permission overrides immediately filter the mode
   }, { width: 50 })
 })
 
+test("unloaded visible skills stay black or white when theme text matches the loaded highlight", async () => {
+  const [mode, setMode] = createSignal<"light" | "dark">("light")
+  const highlight = RGBA.fromHex("#3b7dd8")
+  const muted = RGBA.fromHex("#8b949e")
+  const context = makeContext({
+    prefs: { scope: "registered", token: "listing" },
+    skills: () => [
+      { id: "alpha", name: "Alpha", description: "Visible" },
+      { id: "beta", name: "Beta", description: "Loaded" },
+      { id: "gamma", name: "Gamma", description: "Hidden", autoinvoke: false },
+      { id: "delta", name: "Delta", description: "Hidden loaded", autoinvoke: false },
+    ],
+    messages: () => ["beta", "delta"].map((skill) => ({ type: "skill", skill, name: skill })),
+  })
+  Object.defineProperty(context, "themeMode", { get: mode })
+  Object.assign(context.theme.text, { base: highlight, muted })
+  Object.assign(context.theme.background.action.primary, { focused: highlight })
+  await withPanel(context, async (view) => {
+    await view.waitForFrame((frame) => frame.includes("Gamma"))
+    for (const nextMode of ["light", "dark", "light"] as const) {
+      setMode(nextMode)
+      await view.flush()
+      const normal = RGBA.fromHex(nextMode === "light" ? "#000000" : "#ffffff")
+      for (const [id, name, color] of [["alpha", "Alpha", normal], ["beta", "Beta", highlight], ["gamma", "Gamma", muted], ["delta", "Delta", highlight]] as const) {
+        const row = view.renderer.root.findDescendantById(`skills-panel.${id}`)!
+        const spans = view.captureSpans().lines[row.y].spans
+        expect(spans.find((span) => span.text.includes(name))!.fg.equals(color)).toBe(true)
+        expect(spans.find((span) => span.text.includes("•"))!.fg.equals(color)).toBe(true)
+        expect(spans.find((span) => span.text.includes("tok"))!.fg.equals(muted)).toBe(true)
+      }
+      const header = view.captureSpans().lines[0].spans
+      expect(header.find((span) => span.text.includes("Skills"))!.fg.equals(normal)).toBe(true)
+      expect(header.find((span) => span.text.includes("▼"))!.fg.equals(normal)).toBe(true)
+      expect(header.find((span) => span.text.includes("registered"))!.fg.equals(muted)).toBe(true)
+    }
+  }, { width: 70 })
+})
+
 test("loaded rows match the theme picker selection, not accent or agent colors; header counts stay muted", async () => {
   const orange = RGBA.fromHex("#fab283") // opencode dark primary highlight
   const blue = RGBA.fromHex("#3b7dd8") // opencode light primary highlight
@@ -1666,6 +1793,7 @@ test("loaded rows match the theme picker selection, not accent or agent colors; 
     ],
     messages: () => [{ type: "skill", skill: "beta", name: "beta" }],
   })
+  Object.defineProperty(context, "themeMode", { get: () => color() === orange ? "dark" : "light" })
   const theme = context.theme
   Object.defineProperty(context, "theme", { get: () => ({
     ...theme,
@@ -1678,7 +1806,7 @@ test("loaded rows match the theme picker selection, not accent or agent colors; 
     }),
     text: {
       ...theme.text,
-      base: RGBA.fromHex("#c9d1d9"),
+      base: RGBA.fromHex(color() === orange ? "#c9d1d9" : "#24292f"),
       muted: RGBA.fromHex(color() === orange ? "#8aa68f" : "#aa8833"),
     },
   }) })
@@ -1697,21 +1825,21 @@ test("loaded rows match the theme picker selection, not accent or agent colors; 
     expect(foreground("alpha").equals(white)).toBe(true)
     setColor(blue)
     await view.flush()
-    expect(foreground("Skills").equals(white)).toBe(true)
-    expect(foreground("▼").equals(white)).toBe(true)
+    expect(foreground("Skills").equals(RGBA.fromHex("#000000"))).toBe(true)
+    expect(foreground("▼").equals(RGBA.fromHex("#000000"))).toBe(true)
     expect(foreground("(").equals(context.theme.text.muted)).toBe(true)
     expect(foreground("1 loaded · 2 visible").equals(context.theme.text.muted)).toBe(true)
     expect(foreground("beta").equals(blue)).toBe(true)
     expect(bulletColor().equals(blue)).toBe(true)
-    expect(foreground("alpha").equals(white)).toBe(true)
+    expect(foreground("alpha").equals(RGBA.fromHex("#000000"))).toBe(true)
     setAgentColor(RGBA.fromHex("#70b48f"))
     await view.flush()
     expect(foreground("beta").equals(blue)).toBe(true)
     expect(bulletColor().equals(blue)).toBe(true)
     await view.mockMouse.click(4, 0)
     await view.waitForFrame((frame) => frame.includes("▶ Skills (1 loaded · 2 visible)"))
-    expect(foreground("Skills").equals(white)).toBe(true)
-    expect(foreground("▶").equals(white)).toBe(true)
+    expect(foreground("Skills").equals(RGBA.fromHex("#000000"))).toBe(true)
+    expect(foreground("▶").equals(RGBA.fromHex("#000000"))).toBe(true)
     const header = view.captureSpans().lines[0].spans
     expect(foreground("(").equals(context.theme.text.muted)).toBe(true)
     expect(header.some((span) => span.text.includes("(1 loaded · 2 visible)") && span.fg.equals(context.theme.text.muted))).toBe(true)

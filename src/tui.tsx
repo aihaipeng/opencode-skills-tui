@@ -37,25 +37,30 @@ const locationKey = (location: LocationRef) => JSON.stringify([location.director
 
 function createMarkdownSyntax(theme: ResolvedTheme) {
   const markdown = theme.markdown
+  // Native selection inverts glyph colors; transparent backgrounds fall back to black.
+  const bg = theme.surface("dialog").background.base
   return SyntaxStyle.fromStyles({
-    default: { fg: markdown.text },
-    "markup.heading": { fg: markdown.heading, bold: true },
-    "markup.strong": { fg: markdown.strong, bold: true },
-    "markup.italic": { fg: markdown.emphasis, italic: true },
-    "markup.list": { fg: markdown.listItem },
-    "markup.quote": { fg: markdown.blockQuote, italic: true },
-    "markup.raw": { fg: markdown.code },
-    "markup.link": { fg: markdown.link, underline: true },
-    "markup.link.url": { fg: markdown.link, underline: true },
-    "markup.link.label": { fg: markdown.linkText, underline: true },
-    "markup.strikethrough": { fg: theme.text.muted, dim: true },
+    default: { fg: markdown.text, bg },
+    "markup.heading": { fg: markdown.heading, bg, bold: true },
+    "markup.strong": { fg: markdown.strong, bg, bold: true },
+    "markup.italic": { fg: markdown.emphasis, bg, italic: true },
+    "markup.list": { fg: markdown.listItem, bg },
+    "markup.quote": { fg: markdown.blockQuote, bg, italic: true },
+    "markup.raw": { fg: markdown.code, bg },
+    "markup.link": { fg: markdown.link, bg, underline: true },
+    "markup.link.url": { fg: markdown.link, bg, underline: true },
+    "markup.link.label": { fg: markdown.linkText, bg, underline: true },
+    "markup.strikethrough": { fg: theme.text.muted, bg, dim: true },
   })
 }
 
-function enableMarkdownWrapping(renderable: Renderable) {
-  if (renderable instanceof CodeRenderable) renderable.wrapMode = "char"
+function updateMarkdownCode(renderable: Renderable, syntaxStyle: SyntaxStyle) {
+  if (renderable instanceof CodeRenderable) {
+    renderable.wrapMode = "char"
+    renderable.syntaxStyle = syntaxStyle
+  }
   for (const child of renderable.getChildren()) {
-    if (isRenderable(child)) enableMarkdownWrapping(child)
+    if (isRenderable(child)) updateMarkdownCode(child, syntaxStyle)
   }
 }
 
@@ -83,8 +88,17 @@ function SkillPreviewDialog(props: {
     const right = Math.min(7, Math.floor(dashes / 2))
     return `${"-".repeat(dashes - right)}${label}${"-".repeat(right)}`
   }
-  const syntaxStyle = createMarkdownSyntax(props.theme())
-  onCleanup(() => syntaxStyle.destroy())
+  let markdown: Renderable | undefined
+  const syntaxStyle = createMemo(() => createMarkdownSyntax(props.theme()))
+  createEffect((previous: SyntaxStyle | undefined) => {
+    const style = syntaxStyle()
+    // Markdown updates children next frame; detach async highlighters before freeing the old style.
+    if (markdown) updateMarkdownCode(markdown, style)
+    previous?.destroy()
+    return style
+  })
+  onCleanup(() => syntaxStyle().destroy())
+  const background = () => props.theme().surface("dialog").background.base
 
   // ctrl+click opens links in the browser directly: OSC 8 emission is gated
   // by terminal capability detection and highlight success inside opentui's
@@ -132,7 +146,7 @@ function SkillPreviewDialog(props: {
       paddingRight={2}
       width="100%"
       height={Math.max(1, dims().height - 4)}
-      backgroundColor={props.theme().surface("dialog").background.base}
+      backgroundColor={background()}
     >
       <scrollbox
         ref={(scrollbox) => {
@@ -142,24 +156,26 @@ function SkillPreviewDialog(props: {
         }}
         width="100%" flexGrow={1} minHeight={0} paddingRight={1} scrollX={false}
       >
-        <text width="100%" flexShrink={0} wrapMode="char" fg={props.theme().text.muted} attributes={TextAttributes.ITALIC}>
+        <text width="100%" flexShrink={0} wrapMode="char" fg={props.theme().text.muted} bg={background()} attributes={TextAttributes.ITALIC}>
           {`id: ${props.skill.id}`}
         </text>
-        <text width="100%" flexShrink={0} wrapMode="char" fg={props.theme().text.muted} attributes={TextAttributes.ITALIC}>
+        <text width="100%" flexShrink={0} wrapMode="char" fg={props.theme().text.muted} bg={background()} attributes={TextAttributes.ITALIC}>
           {`stats: chars ${chars} · list entry ${tok("listing")} · load cost ${tok("load-delta")} · total cost ${tok("loaded-total")}`}
         </text>
-        <text width="100%" flexShrink={0} wrapMode="char" fg={props.theme().text.muted} attributes={TextAttributes.ITALIC}>
+        <text width="100%" flexShrink={0} wrapMode="char" fg={props.theme().text.muted} bg={background()} attributes={TextAttributes.ITALIC}>
           {`path: ${source}`}
         </text>
         <box id="skills-preview.separator" width="100%" flexShrink={0} marginBottom={1}
           onSizeChange={function () { setSeparatorWidth(this.width) }}>
-          <text content={separator()} width="100%" flexShrink={0} wrapMode="char" fg={props.theme().text.muted} attributes={TextAttributes.ITALIC} />
+          <text content={separator()} width="100%" flexShrink={0} wrapMode="char" fg={props.theme().text.muted} bg={background()} attributes={TextAttributes.ITALIC} />
         </box>
         <markdown
-          ref={enableMarkdownWrapping}
+          ref={(renderable) => { markdown = renderable; updateMarkdownCode(renderable, syntaxStyle()) }}
           width="100%"
           content={content}
-          syntaxStyle={syntaxStyle}
+          syntaxStyle={syntaxStyle()}
+          fg={props.theme().markdown.text}
+          bg={background()}
           tableOptions={{ wrapMode: "char" }}
           onMouseUp={onPreviewMouseUp}
         />
@@ -588,6 +604,7 @@ export default definePlugin({
             emptyMessage={() => panel().emptyMessage}
             loadedIDs={() => loadedBySession().get(input.sessionID) ?? EMPTY_LOADED_SKILLS}
             theme={() => ctx.theme}
+            themeMode={() => ctx.themeMode}
             collapsed={() => ui.collapsed}
             onToggle={toggleCollapsed}
             onSkillClick={(skill, button) => {
