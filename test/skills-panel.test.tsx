@@ -1,11 +1,11 @@
 /** @jsxImportSource @opentui/solid */
-import { expect, test } from "bun:test"
+import { expect, spyOn, test } from "bun:test"
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Show, createComponent, createRoot, createSignal, getOwner, onCleanup } from "solid-js"
 import { createData } from "@opencode/client/solid"
-import { CliRenderEvents, CodeRenderable, RGBA, Selection, TextAttributes, TextBufferRenderable, TextTableRenderable } from "@opentui/core"
+import { CliRenderEvents, CodeRenderable, RGBA, Selection, SyntaxStyle, TextAttributes, TextBufferRenderable, TextTableRenderable } from "@opentui/core"
 import { TestRecorder } from "@opentui/core/testing"
 import type { KeyEvent, Renderable, ScrollBoxRenderable, TextareaRenderable } from "@opentui/core"
 import { testRender, useRenderer } from "@opentui/solid"
@@ -120,7 +120,11 @@ const makeContext = (overrides: {
       slot: overrides.slot ?? (() => () => {}),
       dialog: {
         show: (render: () => any) => {
-          overrides.onDialogShow?.(render)
+          overrides.onDialogShow?.(() => {
+            const renderer = useRenderer() as { nativeScene?: unknown }
+            Object.assign(context.renderer, { nativeScene: renderer.nativeScene ?? context.renderer })
+            return render()
+          })
           overrides.dialogShow?.()
         },
         set: () => {},
@@ -168,6 +172,7 @@ async function waitForMarkdown(view: Awaited<ReturnType<typeof testRender>>) {
   }
   visit(view.renderer.root)
   await Promise.all(pending)
+  await view.flush()
 }
 
 /** Minimal host: modal keymap lifetime, composer refocus, and the native /skills callback. */
@@ -485,10 +490,12 @@ test("preview dialog renders wrapped description and body without title or overl
   await withPanel(context, async (view) => {
     await view.waitForFrame((frame) => frame.includes("find-skills"))
     await view.mockMouse.click(4, 1)
+    const fromStyles = spyOn(SyntaxStyle, "fromStyles")
     const dialogView = await testRender(() => (
       <box width="100%" height={20}>{dialogRender()}</box>
     ), { width: 110, height: 24 })
     try {
+      expect((fromStyles.mock.calls.at(-1) as unknown[])?.[1]).toBe((context.renderer as { nativeScene?: unknown }).nativeScene)
       await waitForMarkdown(dialogView)
       await dialogView.waitForFrame((frame) => frame.includes("Find Skills"))
       const frame = dialogView.captureCharFrame()
@@ -500,6 +507,7 @@ test("preview dialog renders wrapped description and body without title or overl
       expect(frame).toContain("Body paragraph.")
       expect(frame).not.toContain("# find-skills") // no injected title
     } finally {
+      fromStyles.mockRestore()
       dialogView.renderer.destroy()
     }
   }, { width: 110, height: 24 })

@@ -35,11 +35,11 @@ const definePlugin = (plugin: Plugin.Definition): Plugin.Definition => plugin
 // Same composite key as @opencode/client/solid locationKey.
 const locationKey = (location: LocationRef) => JSON.stringify([location.directory, location.workspaceID])
 
-function createMarkdownSyntax(theme: ResolvedTheme) {
+function createMarkdownSyntax(theme: ResolvedTheme, owner?: unknown) {
   const markdown = theme.markdown
   // Native selection inverts glyph colors; transparent backgrounds fall back to black.
   const bg = theme.surface("dialog").background.base
-  return SyntaxStyle.fromStyles({
+  return (SyntaxStyle as { fromStyles(styles: Parameters<typeof SyntaxStyle.fromStyles>[0], owner?: unknown): SyntaxStyle }).fromStyles({
     default: { fg: markdown.text, bg },
     "markup.heading": { fg: markdown.heading, bg, bold: true },
     "markup.strong": { fg: markdown.strong, bg, bold: true },
@@ -51,7 +51,7 @@ function createMarkdownSyntax(theme: ResolvedTheme) {
     "markup.link.url": { fg: markdown.link, bg, underline: true },
     "markup.link.label": { fg: markdown.linkText, bg, underline: true },
     "markup.strikethrough": { fg: theme.text.muted, bg, dim: true },
-  })
+  }, owner)
 }
 
 function updateMarkdownCode(renderable: Renderable, syntaxStyle: SyntaxStyle) {
@@ -78,6 +78,7 @@ function SkillPreviewDialog(props: {
   renderer: {
     getLinkAt: (x: number, y: number) => string | null
     getSelection: () => unknown
+    nativeScene?: unknown
   }
 }) {
   const dims = useTerminalDimensions()
@@ -89,7 +90,7 @@ function SkillPreviewDialog(props: {
     return `${"-".repeat(dashes - right)}${label}${"-".repeat(right)}`
   }
   let markdown: Renderable | undefined
-  const syntaxStyle = createMemo(() => createMarkdownSyntax(props.theme()))
+  const syntaxStyle = createMemo(() => createMarkdownSyntax(props.theme(), props.renderer.nativeScene))
   createEffect((previous: SyntaxStyle | undefined) => {
     const style = syntaxStyle()
     // Markdown updates children next frame; detach async highlighters before freeing the old style.
